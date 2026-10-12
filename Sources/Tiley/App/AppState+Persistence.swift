@@ -18,6 +18,7 @@ enum UserDefaultsKey {
     static let debugSimulateUpdate = "debugSimulateUpdate"
     static let displayShortcuts = "displayShortcuts"
     static let showNearIcon = "showNearIcon"
+    static let cycleDisplaysOnRepeatedShortcut = "cycleDisplaysOnRepeatedShortcut"
 }
 
 extension AppState {
@@ -77,6 +78,9 @@ extension AppState {
         if let data = defaults.data(forKey: UserDefaultsKey.displayShortcuts),
            let settings = try? JSONDecoder().decode(DisplayShortcutSettings.self, from: data) {
             displayShortcutSettings = settings
+        }
+        if let storedCycleDisplays = defaults.object(forKey: UserDefaultsKey.cycleDisplaysOnRepeatedShortcut) as? Bool {
+            cycleDisplaysOnRepeatedShortcut = storedCycleDisplays
         }
         // `AppDelegate.wasLaunchedAsLoginItem()` may already have queried
         // the login-item status for its own heuristic; don't pay the XPC

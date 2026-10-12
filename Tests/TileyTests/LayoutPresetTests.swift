@@ -7,10 +7,10 @@ struct LayoutPresetTests {
 
     // MARK: - defaultPresets
 
-    @Test("defaultPresets returns 5 presets")
+    @Test("defaultPresets returns 6 presets")
     func defaultPresetsCount() {
         let presets = LayoutPreset.defaultPresets(rows: 6, columns: 6)
-        #expect(presets.count == 5)
+        #expect(presets.count == 6)
     }
 
     @Test("default presets all have local shortcuts")
@@ -27,8 +27,13 @@ struct LayoutPresetTests {
     func defaultPresetsBaseDimensions() {
         let presets = LayoutPreset.defaultPresets(rows: 8, columns: 10)
         for preset in presets {
-            #expect(preset.baseRows == 8)
-            #expect(preset.baseColumns == 10)
+            if preset.name == NSLocalizedString("Center", comment: "Default layout preset name") {
+                #expect(preset.baseRows == 4)
+                #expect(preset.baseColumns == 4)
+            } else {
+                #expect(preset.baseRows == 8)
+                #expect(preset.baseColumns == 10)
+            }
         }
     }
 

@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "この領域に割り当てるアプリケーションを選択してください。";
 "%@ has no windows to place." = "%@ に配置できるウインドウがありません。";
 "Couldn't find a window for %@ after launching." = "%@ を起動しましたが、ウインドウが見つかりませんでした。";
+"Cycle displays on repeated shortcut" = "ショートカット再実行時にディスプレイを巡回";

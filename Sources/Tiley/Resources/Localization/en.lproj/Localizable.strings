@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "Choose an application to assign to this region.";
 "%@ has no windows to place." = "%@ has no windows to place.";
 "Couldn't find a window for %@ after launching." = "Couldn't find a window for %@ after launching.";
+"Cycle displays on repeated shortcut" = "Cycle displays on repeated shortcut";

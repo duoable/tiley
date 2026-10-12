@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "Выберите приложение для назначения этой области.";
 "%@ has no windows to place." = "У %@ нет окон для размещения.";
 "Couldn't find a window for %@ after launching." = "Не удалось найти окно для %@ после запуска.";
+"Cycle displays on repeated shortcut" = "Переключать экраны при повторном нажатии сочетания клавиш";

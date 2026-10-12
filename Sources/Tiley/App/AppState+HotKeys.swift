@@ -278,7 +278,7 @@ extension AppState {
     /// bounds of every display; it was rebuilt on every overlay close (via
     /// `registerAllHotKeys`). Memoized on the screen configuration, like
     /// the Settings view's copy.
-    private func displayFingerprintResolverForHotKeys() -> DisplayFingerprintResolver {
+    func displayFingerprintResolverForHotKeys() -> DisplayFingerprintResolver {
         let signature = NSScreen.screens.map { "\($0.displayID):\($0.frame)" }.joined(separator: "|")
         if let cached = cachedDisplayResolverForHotKeys, cached.signature == signature {
             return cached.resolver

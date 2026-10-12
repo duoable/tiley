@@ -203,15 +203,32 @@ struct SettingsView: View {
             }
 
             TahoeSettingsSection(title: NSLocalizedString("Layouts", comment: "Settings section")) {
-                HStack {
-                    Text("Reset the layout preset list to the defaults.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Button("Restore Defaults") {
-                        appState.resetLayoutPresetsToDefault()
+                VStack(spacing: 0) {
+                    TahoeSettingsRow(
+                        label: NSLocalizedString("Cycle displays on repeated shortcut", comment: "Settings toggle to cycle displays when window is already at target layout"),
+                        systemImage: "display.2",
+                        iconAlignment: .center
+                    ) {
+                        Toggle("", isOn: $draftSettings.cycleDisplaysOnRepeatedShortcut)
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                            .labelsHidden()
                     }
-                    .disabled(isLayoutPresetsAtDefault)
+                    .padding(.vertical, 4)
+
+                    Divider().opacity(0.4)
+
+                    HStack {
+                        Text("Reset the layout preset list to the defaults.")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                        Spacer()
+                        Button("Restore Defaults") {
+                            appState.resetLayoutPresetsToDefault()
+                        }
+                        .disabled(isLayoutPresetsAtDefault)
+                    }
+                    .padding(.vertical, 4)
                 }
             }
 

@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "Scegli un'applicazione da assegnare a questa regione.";
 "%@ has no windows to place." = "%@ non ha finestre da posizionare.";
 "Couldn't find a window for %@ after launching." = "Nessuna finestra trovata per %@ dopo l'avvio.";
+"Cycle displays on repeated shortcut" = "Alterna schermi alla ripetizione della scorciatoia";

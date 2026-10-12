@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "選擇要指派到此區域的應用程式。";
 "%@ has no windows to place." = "%@ 沒有可放置的視窗。";
 "Couldn't find a window for %@ after launching." = "啟動後找不到 %@ 的視窗。";
+"Cycle displays on repeated shortcut" = "重複快捷鍵時循環切換顯示器";

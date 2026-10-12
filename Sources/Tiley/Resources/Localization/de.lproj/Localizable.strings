@@ -156,3 +156,4 @@
 "Choose an application to assign to this region." = "Wähle eine Anwendung, die diesem Bereich zugewiesen werden soll.";
 "%@ has no windows to place." = "%@ hat keine Fenster zum Platzieren.";
 "Couldn't find a window for %@ after launching." = "Nach dem Start wurde kein Fenster für %@ gefunden.";
+"Cycle displays on repeated shortcut" = "Bildschirme bei wiederholtem Kurzbefehl durchwechseln";
