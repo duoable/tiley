@@ -156,3 +156,5 @@
 "Choose an application to assign to this region." = "Choose an application to assign to this region.";
 "%@ has no windows to place." = "%@ has no windows to place.";
 "Couldn't find a window for %@ after launching." = "Couldn't find a window for %@ after launching.";
+"Restore Default Layouts" = "Restore Default Layouts";
+"Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed.";

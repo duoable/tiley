@@ -7,10 +7,10 @@ struct LayoutPresetTests {
 
     // MARK: - defaultPresets
 
-    @Test("defaultPresets returns 5 presets")
+    @Test("defaultPresets returns 6 presets")
     func defaultPresetsCount() {
         let presets = LayoutPreset.defaultPresets(rows: 6, columns: 6)
-        #expect(presets.count == 5)
+        #expect(presets.count == 6)
     }
 
     @Test("default presets all have local shortcuts")
@@ -27,8 +27,13 @@ struct LayoutPresetTests {
     func defaultPresetsBaseDimensions() {
         let presets = LayoutPreset.defaultPresets(rows: 8, columns: 10)
         for preset in presets {
-            #expect(preset.baseRows == 8)
-            #expect(preset.baseColumns == 10)
+            if preset.name == NSLocalizedString("Center", comment: "Default layout preset name") {
+                #expect(preset.baseRows == 4)
+                #expect(preset.baseColumns == 4)
+            } else {
+                #expect(preset.baseRows == 8)
+                #expect(preset.baseColumns == 10)
+            }
         }
     }
 
@@ -136,4 +141,63 @@ struct LayoutPresetTests {
         let scaled = preset.scaledSelection(toRows: 6, columns: 6)
         #expect(scaled == selection.normalized)
     }
+
+    // MARK: - Reset Default Layouts Confirmation
+
+    @Test("makeResetLayoutPresetsAlert creates a warning alert with Restore Defaults and Cancel")
+    @MainActor
+    func resetLayoutPresetsAlertConfiguration() {
+        let alert = SettingsView.makeResetLayoutPresetsAlert()
+        #expect(alert.messageText == NSLocalizedString("Restore Default Layouts", comment: "Alert title for restoring default layout presets"))
+        #expect(alert.informativeText == NSLocalizedString("Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed.", comment: "Alert message for restoring default layout presets"))
+        #expect(alert.alertStyle == .warning)
+        #expect(alert.buttons.count == 2)
+        #expect(alert.buttons[0].title == NSLocalizedString("Restore Defaults", comment: "Restore defaults button title"))
+        #expect(alert.buttons[1].title == NSLocalizedString("Cancel", comment: "Cancel button title"))
+    }
+
+    @Test("confirmResetLayoutPresets cancels when alert returns cancel")
+    @MainActor
+    func confirmResetLayoutPresetsCancellation() {
+        let appState = AppState()
+        let customPreset = LayoutPreset(
+            id: UUID(),
+            name: "Custom User Layout",
+            selection: GridSelection(startColumn: 0, startRow: 0, endColumn: 1, endRow: 1),
+            baseRows: appState.rows,
+            baseColumns: appState.columns,
+            shortcuts: []
+        )
+        appState.layoutPresets.append(customPreset)
+        let countBefore = appState.layoutPresets.count
+
+        let settingsView = SettingsView(appState: appState)
+        settingsView.confirmResetLayoutPresets(alertRunner: { _ in .alertSecondButtonReturn })
+
+        #expect(appState.layoutPresets.count == countBefore)
+        #expect(appState.layoutPresets.contains(where: { $0.id == customPreset.id }))
+    }
+
+    @Test("confirmResetLayoutPresets resets presets when alert returns first button")
+    @MainActor
+    func confirmResetLayoutPresetsConfirmation() {
+        let appState = AppState()
+        let customPreset = LayoutPreset(
+            id: UUID(),
+            name: "Custom User Layout",
+            selection: GridSelection(startColumn: 0, startRow: 0, endColumn: 1, endRow: 1),
+            baseRows: appState.rows,
+            baseColumns: appState.columns,
+            shortcuts: []
+        )
+        appState.layoutPresets.append(customPreset)
+
+        let settingsView = SettingsView(appState: appState)
+        settingsView.confirmResetLayoutPresets(alertRunner: { _ in .alertFirstButtonReturn })
+
+        let defaults = LayoutPreset.defaultPresets(rows: appState.rows, columns: appState.columns)
+        #expect(appState.layoutPresets.count == defaults.count)
+        #expect(!appState.layoutPresets.contains(where: { $0.id == customPreset.id }))
+    }
 }
+

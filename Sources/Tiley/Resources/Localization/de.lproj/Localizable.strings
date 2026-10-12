@@ -156,3 +156,5 @@
 "Choose an application to assign to this region." = "Wähle eine Anwendung, die diesem Bereich zugewiesen werden soll.";
 "%@ has no windows to place." = "%@ hat keine Fenster zum Platzieren.";
 "Couldn't find a window for %@ after launching." = "Nach dem Start wurde kein Fenster für %@ gefunden.";
+"Restore Default Layouts" = "Standard-Layouts wiederherstellen";
+"Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "Möchten Sie wirklich alle Layout-Vorlagen auf die Standardwerte zurücksetzen? Eigene Layouts werden gelöscht.";

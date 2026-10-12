@@ -156,3 +156,5 @@
 "Choose an application to assign to this region." = "이 영역에 할당할 애플리케이션을 선택하세요.";
 "%@ has no windows to place." = "%@에 배치할 수 있는 윈도우가 없습니다.";
 "Couldn't find a window for %@ after launching." = "%@을(를) 실행했지만 윈도우를 찾지 못했습니다.";
+"Restore Default Layouts" = "기본 레이아웃 복원";
+"Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "모든 레이아웃 프리셋을 기본값으로 되돌리시겠습니까? 사용자 정의 레이아웃이 삭제됩니다.";

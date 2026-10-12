@@ -209,7 +209,7 @@ struct SettingsView: View {
                         .foregroundStyle(.tertiary)
                     Spacer()
                     Button("Restore Defaults") {
-                        appState.resetLayoutPresetsToDefault()
+                        confirmResetLayoutPresets()
                     }
                     .disabled(isLayoutPresetsAtDefault)
                 }
@@ -434,6 +434,23 @@ struct SettingsView: View {
             current.baseRows == def.baseRows &&
             current.baseColumns == def.baseColumns &&
             current.shortcuts == def.shortcuts
+        }
+    }
+
+    static func makeResetLayoutPresetsAlert() -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Restore Default Layouts", comment: "Alert title for restoring default layout presets")
+        alert.informativeText = NSLocalizedString("Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed.", comment: "Alert message for restoring default layout presets")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("Restore Defaults", comment: "Restore defaults button title"))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: "Cancel button title"))
+        return alert
+    }
+
+    func confirmResetLayoutPresets(alertRunner: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() }) {
+        let alert = Self.makeResetLayoutPresetsAlert()
+        if alertRunner(alert) == .alertFirstButtonReturn {
+            appState.resetLayoutPresetsToDefault()
         }
     }
 

@@ -156,3 +156,5 @@
 "Choose an application to assign to this region." = "选择要分配给此区域的应用程序。";
 "%@ has no windows to place." = "%@ 没有可放置的窗口。";
 "Couldn't find a window for %@ after launching." = "启动后未能找到 %@ 的窗口。";
+"Restore Default Layouts" = "恢复默认布局";
+"Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "确定要将所有布局预设恢复为默认值吗？自定义布局将被删除。";
