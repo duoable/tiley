@@ -70,6 +70,8 @@
 "Don't Eject" = "Не извлекать";
 "Add Shortcut" = "Добавить сочетание";
 "Add Global Shortcut" = "Добавить глобальное сочетание";
+"Make Global Shortcut" = "Сделать глобальным сочетанием";
+"Make Local Shortcut" = "Сделать локальным сочетанием";
 "Edit Layout" = "Редактировать макет";
 "Done Editing" = "Завершить редактирование";
 "Delete Shortcut" = "Удалить сочетание клавиш";

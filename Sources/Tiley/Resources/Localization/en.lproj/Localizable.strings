@@ -70,6 +70,8 @@
 "Don't Eject" = "Don't Eject";
 "Add Shortcut" = "Add Shortcut";
 "Add Global Shortcut" = "Add Global Shortcut";
+"Make Global Shortcut" = "Make Global Shortcut";
+"Make Local Shortcut" = "Make Local Shortcut";
 "Edit Layout" = "Edit Layout";
 "Done Editing" = "Done Editing";
 "Delete Shortcut" = "Delete Shortcut";

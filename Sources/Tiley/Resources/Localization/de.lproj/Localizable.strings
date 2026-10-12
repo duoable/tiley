@@ -70,6 +70,8 @@
 "Don't Eject" = "Nicht auswerfen";
 "Add Shortcut" = "Tastenkürzel hinzufügen";
 "Add Global Shortcut" = "Globales Kürzel hinzufügen";
+"Make Global Shortcut" = "Als globales Kürzel festlegen";
+"Make Local Shortcut" = "Als lokales Kürzel festlegen";
 "Edit Layout" = "Layout bearbeiten";
 "Done Editing" = "Bearbeitung abschließen";
 "Delete Shortcut" = "Tastenkürzel löschen";

@@ -70,6 +70,8 @@
 "Don't Eject" = "Não ejetar";
 "Add Shortcut" = "Adicionar atalho";
 "Add Global Shortcut" = "Adicionar atalho global";
+"Make Global Shortcut" = "Tornar atalho global";
+"Make Local Shortcut" = "Tornar atalho local";
 "Edit Layout" = "Editar layout";
 "Done Editing" = "Concluir edição";
 "Delete Shortcut" = "Excluir atalho";

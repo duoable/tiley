@@ -22,7 +22,11 @@ extension AppState {
         // Re-registering tears down and re-creates every Carbon hotkey;
         // it's only needed when this edit actually touched the shortcuts
         // (renames, app assignments, rectangle edits, etc. don't).
-        if layoutPresets[index].shortcuts != shortcutsBefore {
+        // `HotKeyShortcut.==` ignores `isGlobal`, so compare it explicitly:
+        // switching a shortcut between local and global must re-register.
+        let shortcutsAfter = layoutPresets[index].shortcuts
+        if shortcutsAfter != shortcutsBefore
+            || shortcutsAfter.map(\.isGlobal) != shortcutsBefore.map(\.isGlobal) {
             registerPresetHotKeys()
         }
     }

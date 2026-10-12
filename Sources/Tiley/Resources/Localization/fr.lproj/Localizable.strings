@@ -70,6 +70,8 @@
 "Don't Eject" = "Ne pas éjecter";
 "Add Shortcut" = "Ajouter un raccourci";
 "Add Global Shortcut" = "Ajouter un raccourci global";
+"Make Global Shortcut" = "Rendre le raccourci global";
+"Make Local Shortcut" = "Rendre le raccourci local";
 "Edit Layout" = "Modifier la disposition";
 "Done Editing" = "Terminer la modification";
 "Delete Shortcut" = "Supprimer le raccourci";

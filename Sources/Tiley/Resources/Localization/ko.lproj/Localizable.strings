@@ -70,6 +70,8 @@
 "Don't Eject" = "추출 안 함";
 "Add Shortcut" = "단축키 추가";
 "Add Global Shortcut" = "전역 단축키 추가";
+"Make Global Shortcut" = "전역 단축키로 변경";
+"Make Local Shortcut" = "로컬 단축키로 변경";
 "Edit Layout" = "레이아웃 편집";
 "Done Editing" = "편집 완료";
 "Delete Shortcut" = "단축키 삭제";

@@ -70,6 +70,8 @@
 "Don't Eject" = "No expulsar";
 "Add Shortcut" = "Añadir atajo";
 "Add Global Shortcut" = "Añadir atajo global";
+"Make Global Shortcut" = "Convertir en atajo global";
+"Make Local Shortcut" = "Convertir en atajo local";
 "Edit Layout" = "Editar disposición";
 "Done Editing" = "Finalizar edición";
 "Delete Shortcut" = "Eliminar atajo";
