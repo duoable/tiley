@@ -136,6 +136,7 @@ struct ShortcutBadgeLabelView: View {
     let isEditing: Bool
     var showDelete: Bool = false
     var onDelete: (() -> Void)? = nil
+    var onToggleGlobal: (() -> Void)? = nil
     var onTap: (() -> Void)? = nil
 
     @State private var isLabelHovered = false
@@ -145,9 +146,26 @@ struct ShortcutBadgeLabelView: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            if showDelete, let onToggleGlobal {
+                // Scope toggle: switch an existing shortcut between local
+                // (overlay only) and global (system-wide).
+                Button(action: onToggleGlobal) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(shortcut.isGlobal ? Color.accentColor : Color.secondary.opacity(0.5))
+                        .padding(.leading, 5)
+                        .padding(.vertical, 3)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .instantTooltip(shortcut.isGlobal
+                    ? NSLocalizedString("Make Local Shortcut", comment: "Tooltip for switching a global layout shortcut to local")
+                    : NSLocalizedString("Make Global Shortcut", comment: "Tooltip for switching a local layout shortcut to global"))
+            }
+
             // Shortcut label area
             HStack(spacing: 3) {
-                if shortcut.isGlobal {
+                if shortcut.isGlobal, !(showDelete && onToggleGlobal != nil) {
                     Image(systemName: "globe")
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(Color.accentColor)

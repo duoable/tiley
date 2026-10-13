@@ -70,6 +70,8 @@
 "Don't Eject" = "取り出さない";
 "Add Shortcut" = "ショートカットを追加";
 "Add Global Shortcut" = "グローバルショートカットを追加";
+"Make Global Shortcut" = "グローバルショートカットにする";
+"Make Local Shortcut" = "ローカルショートカットにする";
 "Edit Layout" = "レイアウトを編集";
 "Done Editing" = "編集を完了";
 "Delete Shortcut" = "ショートカットを削除";

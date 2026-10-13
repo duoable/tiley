@@ -70,6 +70,8 @@
 "Don't Eject" = "不推出";
 "Add Shortcut" = "添加快捷键";
 "Add Global Shortcut" = "添加全局快捷键";
+"Make Global Shortcut" = "设为全局快捷键";
+"Make Local Shortcut" = "设为本地快捷键";
 "Edit Layout" = "编辑布局";
 "Done Editing" = "完成编辑";
 "Delete Shortcut" = "删除快捷键";

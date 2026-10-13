@@ -70,6 +70,8 @@
 "Don't Eject" = "Non espellere";
 "Add Shortcut" = "Aggiungi scorciatoia";
 "Add Global Shortcut" = "Aggiungi scorciatoia globale";
+"Make Global Shortcut" = "Rendi scorciatoia globale";
+"Make Local Shortcut" = "Rendi scorciatoia locale";
 "Edit Layout" = "Modifica layout";
 "Done Editing" = "Fine modifica";
 "Delete Shortcut" = "Elimina scorciatoia";

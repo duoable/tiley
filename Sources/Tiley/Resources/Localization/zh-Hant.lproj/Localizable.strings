@@ -70,6 +70,8 @@
 "Don't Eject" = "不退出";
 "Add Shortcut" = "新增快捷鍵";
 "Add Global Shortcut" = "新增全域快捷鍵";
+"Make Global Shortcut" = "設為全域快捷鍵";
+"Make Local Shortcut" = "設為本機快捷鍵";
 "Edit Layout" = "編輯佈局";
 "Done Editing" = "完成編輯";
 "Delete Shortcut" = "刪除快速鍵";

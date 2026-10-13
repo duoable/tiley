@@ -2757,7 +2757,11 @@ struct MainWindowView: View {
                 onShortcutRecorded: { newShortcut in
                     appState.updateLayoutPreset(preset.id) { p in
                         guard index < p.shortcuts.count else { return }
-                        p.shortcuts[index] = newShortcut
+                        // The recorder always yields a local shortcut; keep the
+                        // global/local scope of the shortcut being replaced.
+                        var replacement = newShortcut
+                        replacement.isGlobal = p.shortcuts[index].isGlobal
+                        p.shortcuts[index] = replacement
                     }
                     let keepEditing = editingPresetID == preset.id
                     replacingShortcutIndex = nil
@@ -2796,6 +2800,11 @@ struct MainWindowView: View {
     private func shortcutBadgeLabel(for preset: LayoutPreset, index: Int, shortcut: HotKeyShortcut, isEditing: Bool, isAdding: Bool, isReplacing: Bool) -> some View {
         ShortcutBadgeLabelView(shortcut: shortcut, isEditing: isEditing, showDelete: isEditing && !isReplacing, onDelete: {
             removeShortcut(at: index, from: preset.id)
+        }, onToggleGlobal: {
+            appState.updateLayoutPreset(preset.id) { p in
+                guard index < p.shortcuts.count else { return }
+                p.shortcuts[index].isGlobal.toggle()
+            }
         }, onTap: {
             guard !isReplacing, !isAdding else { return }
             appState.selectLayoutPreset(preset.id)
