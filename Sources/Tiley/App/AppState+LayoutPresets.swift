@@ -116,8 +116,26 @@ extension AppState {
         lastTargetPID = target.processIdentifier
         selectedLayoutPresetID = id
 
+        if handleTogglePresetIfApplicable(preset: preset, target: target) {
+            return
+        }
+
         if let next = targetScreenForPreset(id: id, currentTarget: target) {
             applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+            return
+        }
+
+        executePresetLayout(preset: preset, target: target)
+        TelemetryDeck.signal("presetApplied", parameters: ["presetName": preset.name])
+    }
+
+    func executePresetLayout(preset: LayoutPreset, target: WindowTarget) {
+        guard !preset.isEmpty else {
+            if let win = target.windowElement {
+                accessibilityService.minimizeWindow(win)
+            }
+            presetMinimizedWindows[preset.id] = [PresetWindowRecord(cgWindowID: target.cgWindowID, pid: target.processIdentifier, windowElement: target.windowElement)]
+            finalizeLayoutApplication()
             return
         }
 
@@ -128,7 +146,7 @@ extension AppState {
         if hasAnyAssignment {
             Task { @MainActor [self] in
                 await applyPresetWithAppAssignments(
-                    presetID: id,
+                    presetID: preset.id,
                     allSelections: allSelections,
                     rectangleApps: rectangleApps,
                     groupedPairs: preset.groupedPairs,
@@ -155,7 +173,203 @@ extension AppState {
         } else {
             apply(selection: allSelections.first ?? preset.scaledSelection(toRows: rows, columns: columns), to: target)
         }
-        TelemetryDeck.signal("presetApplied", parameters: ["presetName": preset.name])
+    }
+
+    // MARK: - Toggle to Minimize / Restore
+
+    /// Checks whether the preset should toggle (minimize or unminimize) instead of performing standard layout.
+    /// Returns `true` if a toggle action was executed.
+    @discardableResult
+    func handleTogglePresetIfApplicable(preset: LayoutPreset, target: WindowTarget) -> Bool {
+        // If toggleToMinimize is false AND the preset is not empty, do not toggle.
+        guard preset.toggleToMinimize || preset.isEmpty else { return false }
+
+        let presetID = preset.id
+
+        // Phase 1: Unminimize check.
+        // If we previously minimized windows for this preset and any of them are still minimized, restore them.
+        if let recorded = presetMinimizedWindows[presetID], !recorded.isEmpty {
+            var anyStillMinimized = false
+            for rec in recorded {
+                if let element = rec.windowElement, accessibilityService.isWindowMinimized(element) {
+                    anyStillMinimized = true
+                    break
+                }
+                if !accessibilityService.minimizedWindows(for: rec.pid).isEmpty {
+                    anyStillMinimized = true
+                    break
+                }
+            }
+
+            if anyStillMinimized {
+                for rec in recorded {
+                    if let element = rec.windowElement {
+                        accessibilityService.unminimizeWindow(element)
+                        accessibilityService.raiseWindow(element)
+                    } else {
+                        for win in accessibilityService.minimizedWindows(for: rec.pid) {
+                            accessibilityService.unminimizeWindow(win)
+                            accessibilityService.raiseWindow(win)
+                        }
+                    }
+                    NSRunningApplication(processIdentifier: rec.pid)?.activate()
+                }
+
+                presetMinimizedWindows[presetID] = nil
+                dismissOverlayImmediately()
+                orderOutAllMainWindows()
+
+                if !preset.isEmpty {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                        guard let self else { return }
+                        self.activeLayoutTarget = target
+                        self.executePresetLayout(preset: preset, target: target)
+                    }
+                } else {
+                    finalizeLayoutApplication()
+                }
+                return true
+            }
+        }
+
+        // Phase 2: Minimize check.
+        // If the preset is completely empty (no tiles selected):
+        if preset.isEmpty {
+            let targetsToMinimize: [WindowTarget]
+            if selectedWindowIndices.count > 1 {
+                targetsToMinimize = selectedWindowIndices.compactMap { idx in
+                    idx < availableWindowTargets.count ? availableWindowTargets[idx] : nil
+                }
+            } else {
+                targetsToMinimize = [target]
+            }
+
+            guard !targetsToMinimize.isEmpty else { return true }
+
+            var records: [PresetWindowRecord] = []
+            for t in targetsToMinimize {
+                if let win = t.windowElement {
+                    accessibilityService.minimizeWindow(win)
+                }
+                records.append(PresetWindowRecord(cgWindowID: t.cgWindowID, pid: t.processIdentifier, windowElement: t.windowElement))
+            }
+
+            presetMinimizedWindows[presetID] = records
+            presetPlacedWindows[presetID] = nil
+            dismissOverlayImmediately()
+            orderOutAllMainWindows()
+            finalizeLayoutApplication()
+            return true
+        }
+
+        // For non-empty presets with toggleToMinimize == true:
+        // Check if the preset's target windows are currently in their layout positions and active.
+        let isAlreadyArranged: Bool
+
+        let rectangleApps = preset.normalizedRectangleApps
+        let hasAnyAssignment = rectangleApps.contains(where: { $0 != nil })
+
+        let currentVisibleFrame: CGRect = {
+            if let screen = NSScreen.screens.first(where: { $0.frame == target.screenFrame }) {
+                return screen.visibleFrame
+            }
+            return target.visibleFrame
+        }()
+
+        if hasAnyAssignment {
+            var allMatch = true
+            var foundAny = false
+            let allSelections = preset.allScaledSelections(toRows: rows, columns: columns)
+
+            for (idx, maybeBID) in rectangleApps.enumerated() {
+                guard let bid = maybeBID, idx < allSelections.count else { continue }
+                guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else {
+                    allMatch = false
+                    break
+                }
+                guard let winTarget = availableWindowTargets.first(where: { $0.processIdentifier == app.processIdentifier }) else {
+                    allMatch = false
+                    break
+                }
+                let expected = GridCalculator.frame(for: allSelections[idx], in: currentVisibleFrame, rows: rows, columns: columns, gap: gap)
+                if !Self.isWindowFrame(winTarget.frame, approximatelyMatching: expected, tolerance: 5.0) {
+                    allMatch = false
+                    break
+                }
+                foundAny = true
+            }
+            isAlreadyArranged = foundAny && allMatch
+        } else {
+            let allSelections = preset.allScaledSelections(toRows: rows, columns: columns)
+
+            if allSelections.count <= 1 {
+                let expected = GridCalculator.frame(
+                    for: allSelections.first ?? preset.scaledSelection(toRows: rows, columns: columns),
+                    in: currentVisibleFrame,
+                    rows: rows,
+                    columns: columns,
+                    gap: gap
+                )
+                let matchesExpected = Self.isWindowFrame(target.frame, approximatelyMatching: expected, tolerance: 5.0)
+                let matchesRecorded = (lastPresetPlacement?.windowID == target.cgWindowID
+                    && lastPresetPlacement?.presetID == presetID
+                    && Self.isWindowFrame(target.frame, approximatelyMatching: lastPresetPlacement!.frame, tolerance: 5.0))
+                isAlreadyArranged = matchesExpected || matchesRecorded
+            } else {
+                if let placedIDs = presetPlacedWindows[presetID], placedIDs.count >= allSelections.count {
+                    var allMatch = true
+                    for (i, wid) in placedIDs.prefix(allSelections.count).enumerated() {
+                        guard let current = availableWindowTargets.first(where: { $0.cgWindowID == wid }) else {
+                            allMatch = false
+                            break
+                        }
+                        let expected = GridCalculator.frame(for: allSelections[i], in: currentVisibleFrame, rows: rows, columns: columns, gap: gap)
+                        if !Self.isWindowFrame(current.frame, approximatelyMatching: expected, tolerance: 5.0) {
+                            allMatch = false
+                            break
+                        }
+                    }
+                    isAlreadyArranged = allMatch
+                } else {
+                    isAlreadyArranged = false
+                }
+            }
+        }
+
+        if isAlreadyArranged {
+            var records: [PresetWindowRecord] = []
+            let windowsToMinimize: [WindowTarget]
+
+            if hasAnyAssignment {
+                windowsToMinimize = rectangleApps.compactMap { maybeBID in
+                    guard let bid = maybeBID else { return nil }
+                    guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else { return nil }
+                    return availableWindowTargets.first(where: { $0.processIdentifier == app.processIdentifier })
+                }
+            } else if let placedIDs = presetPlacedWindows[presetID], !placedIDs.isEmpty {
+                windowsToMinimize = placedIDs.compactMap { wid in
+                    availableWindowTargets.first(where: { $0.cgWindowID == wid })
+                }
+            } else {
+                windowsToMinimize = [target]
+            }
+
+            for t in windowsToMinimize {
+                if let win = t.windowElement {
+                    accessibilityService.minimizeWindow(win)
+                }
+                records.append(PresetWindowRecord(cgWindowID: t.cgWindowID, pid: t.processIdentifier, windowElement: t.windowElement))
+            }
+
+            presetMinimizedWindows[presetID] = records
+            presetPlacedWindows[presetID] = nil
+            dismissOverlayImmediately()
+            orderOutAllMainWindows()
+            finalizeLayoutApplication()
+            return true
+        }
+
+        return false
     }
 
     /// Applies a layout preset on the screen where the mouse cursor is located.

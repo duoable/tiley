@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Aggiungi scorciatoia globale";
 "Make Global Shortcut" = "Rendi scorciatoia globale";
 "Make Local Shortcut" = "Rendi scorciatoia locale";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Alterna per ridurre a icona: attivato. Premendo di nuovo il preset, le finestre verranno ridotte a icona. Fai clic per disattivare.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Alterna per ridurre a icona: disattivato. Fai clic per alternare le finestre tra disposte e ridotte a icona.";
+"Toggle to minimize: enabled" = "Alterna per ridurre a icona: attivato";
+"Toggle" = "Alterna";
 "Edit Layout" = "Modifica layout";
 "Done Editing" = "Fine modifica";
 "Delete Shortcut" = "Elimina scorciatoia";

@@ -360,6 +360,8 @@ extension AppState {
         )
         alignAdjacentEdgesAfterPreset(placements: placements, selections: allSelections, screenFrame: currentScreenFrame)
         recordTileyPlacedFrames(for: placements.map { $0.target.cgWindowID })
+        self.presetPlacedWindows[presetID] = placements.map { $0.target.cgWindowID }
+        self.presetMinimizedWindows[presetID] = nil
         isApplyingGroupTransform = false
 
         // 5. Restore displaced non-target windows.

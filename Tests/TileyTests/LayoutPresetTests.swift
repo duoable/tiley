@@ -199,5 +199,56 @@ struct LayoutPresetTests {
         #expect(appState.layoutPresets.count == defaults.count)
         #expect(!appState.layoutPresets.contains(where: { $0.id == customPreset.id }))
     }
+
+    // MARK: - Toggle to Minimize
+
+    @Test("Codable round-trip preserves toggleToMinimize flag")
+    func codableRoundTripToggleToMinimize() throws {
+        let original = LayoutPreset(
+            id: UUID(),
+            name: "Toggle Test",
+            selection: GridSelection(startColumn: 0, startRow: 0, endColumn: 2, endRow: 3),
+            baseRows: 6,
+            baseColumns: 6,
+            shortcuts: [],
+            toggleToMinimize: true
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(LayoutPreset.self, from: data)
+        #expect(decoded == original)
+        #expect(decoded.toggleToMinimize == true)
+    }
+
+    @Test("decoding JSON without toggleToMinimize defaults to false")
+    func codableDefaultToggleToMinimizeFalse() throws {
+        let id = UUID()
+        let json = """
+        {
+            "id": "\(id.uuidString)",
+            "name": "NoToggle",
+            "selection": {"startColumn": 0, "startRow": 0, "endColumn": 5, "endRow": 5},
+            "baseRows": 6,
+            "baseColumns": 6,
+            "shortcuts": []
+        }
+        """
+        let data = Data(json.utf8)
+        let decoded = try JSONDecoder().decode(LayoutPreset.self, from: data)
+        #expect(decoded.toggleToMinimize == false)
+    }
+
+    @Test("empty preset reports isEmpty true and allSelections empty")
+    func emptyPresetReportsIsEmpty() {
+        let preset = LayoutPreset(
+            id: UUID(),
+            name: "Empty",
+            selection: LayoutPreset.emptySelection,
+            baseRows: 6,
+            baseColumns: 6,
+            shortcuts: []
+        )
+        #expect(preset.isEmpty == true)
+        #expect(preset.allSelections.isEmpty)
+    }
 }
 

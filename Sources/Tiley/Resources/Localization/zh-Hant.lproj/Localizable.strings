@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "新增全域快捷鍵";
 "Make Global Shortcut" = "設為全域快捷鍵";
 "Make Local Shortcut" = "設為本機快捷鍵";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "切換為最小化：已啟用。視窗排列完成後再次套用預設將最小化視窗。點擊以停用。";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "切換為最小化：已停用。點擊以啟用在排列與最小化之間切換。";
+"Toggle to minimize: enabled" = "切換為最小化：已啟用";
+"Toggle" = "切換";
 "Edit Layout" = "編輯佈局";
 "Done Editing" = "完成編輯";
 "Delete Shortcut" = "刪除快速鍵";

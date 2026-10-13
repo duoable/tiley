@@ -208,6 +208,22 @@ final class WindowManager {
         accessibilityService.raiseWindow(window)
     }
 
+    @discardableResult
+    func minimizeWindow(target: WindowTarget) -> Bool {
+        guard let window = target.windowElement else { return false }
+        return accessibilityService.minimizeWindow(window)
+    }
+
+    @discardableResult
+    func unminimizeWindow(target: WindowTarget) -> Bool {
+        guard let window = target.windowElement else { return false }
+        return accessibilityService.unminimizeWindow(window)
+    }
+
+    func isWindowMinimized(target: WindowTarget) -> Bool {
+        guard let window = target.windowElement else { return false }
+        return accessibilityService.isWindowMinimized(window)
+    }
 }
 
 extension NSScreen {

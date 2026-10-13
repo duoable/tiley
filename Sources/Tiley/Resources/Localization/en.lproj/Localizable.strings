@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Add Global Shortcut";
 "Make Global Shortcut" = "Make Global Shortcut";
 "Make Local Shortcut" = "Make Local Shortcut";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized.";
+"Toggle to minimize: enabled" = "Toggle to minimize: enabled";
+"Toggle" = "Toggle";
 "Edit Layout" = "Edit Layout";
 "Done Editing" = "Done Editing";
 "Delete Shortcut" = "Delete Shortcut";

@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "グローバルショートカットを追加";
 "Make Global Shortcut" = "グローバルショートカットにする";
 "Make Local Shortcut" = "ローカルショートカットにする";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "最小化の切り替え: 有効。ウインドウ配置後にもう一度プリセットを適用すると最小化します。クリックして無効化。";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "最小化の切り替え: 無効。クリックして配置と最小化の切り替えを有効化。";
+"Toggle to minimize: enabled" = "最小化の切り替え: 有効";
+"Toggle" = "切り替え";
 "Edit Layout" = "レイアウトを編集";
 "Done Editing" = "編集を完了";
 "Delete Shortcut" = "ショートカットを削除";

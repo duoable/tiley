@@ -500,6 +500,10 @@ final class AppState: NSObject, NSMenuDelegate {
     @ObservationIgnored var recentlySetFrames: [CGWindowID: (frame: CGRect, time: CFAbsoluteTime)] = [:]
     /// Records the last preset application for display cycling detection (especially for constrained windows).
     @ObservationIgnored var lastPresetPlacement: (windowID: CGWindowID, presetID: UUID, displayID: CGDirectDisplayID, frame: CGRect)?
+    /// Windows minimized by presets when toggled to minimize.
+    @ObservationIgnored var presetMinimizedWindows: [UUID: [PresetWindowRecord]] = [:]
+    /// Windows last placed by presets.
+    @ObservationIgnored var presetPlacedWindows: [UUID: [CGWindowID]] = [:]
 
     /// Windows that have moved/resized via the user (not via Tiley) since the last
     /// settle pass. Drained by `processManuallyMovedWindows()` after the user
@@ -1683,6 +1687,10 @@ final class AppState: NSObject, NSMenuDelegate {
             )
             self.alignAdjacentEdgesAfterPreset(placements: placements, selections: allSelections, screenFrame: currentScreenFrame)
             self.recordTileyPlacedFrames(for: placements.map { $0.target.cgWindowID })
+            if let selPresetID = self.selectedLayoutPresetID {
+                self.presetPlacedWindows[selPresetID] = placements.map { $0.target.cgWindowID }
+                self.presetMinimizedWindows[selPresetID] = nil
+            }
             self.isApplyingGroupTransform = false
 
             // Raise in the requested order so the primary (first-selected) ends
@@ -1917,6 +1925,10 @@ final class AppState: NSObject, NSMenuDelegate {
             )
             self.alignAdjacentEdgesAfterPreset(placements: placements, selections: selections, screenFrame: currentScreenFrame)
             self.recordTileyPlacedFrames(for: placements.map { $0.target.cgWindowID })
+            if let selPresetID = self.selectedLayoutPresetID {
+                self.presetPlacedWindows[selPresetID] = placements.map { $0.target.cgWindowID }
+                self.presetMinimizedWindows[selPresetID] = nil
+            }
             self.isApplyingGroupTransform = false
 
             // Raise in the requested order so the primary ends up topmost.
@@ -2052,6 +2064,10 @@ final class AppState: NSObject, NSMenuDelegate {
                    let screen = NSScreen.screens.first(where: { $0.frame == target.screenFrame }) {
                     self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
                 }
+                if let selPresetID = self.selectedLayoutPresetID {
+                    self.presetPlacedWindows[selPresetID] = [target.cgWindowID]
+                    self.presetMinimizedWindows[selPresetID] = nil
+                }
             }
             self.isApplyingGroupTransform = false
             switch result {
@@ -2155,6 +2171,10 @@ final class AppState: NSObject, NSMenuDelegate {
                    let screen = NSScreen.screens.first(where: { $0.frame == currentScreenFrame }) {
                     self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
                 }
+                if let selPresetID = self.selectedLayoutPresetID {
+                    self.presetPlacedWindows[selPresetID] = [target.cgWindowID]
+                    self.presetMinimizedWindows[selPresetID] = nil
+                }
             }
             self.isApplyingGroupTransform = false
             switch result {
@@ -2200,6 +2220,15 @@ final class AppState: NSObject, NSMenuDelegate {
 
         activeLayoutTarget = target
         lastTargetPID = target.processIdentifier
+
+        if handleTogglePresetIfApplicable(preset: preset, target: target) {
+            return
+        }
+
+        guard !preset.isEmpty else {
+            finalizeLayoutApplication()
+            return
+        }
 
         // If the preset has any app assignment, route through the
         // assignment-aware async pipeline (matches applyLayoutPreset).

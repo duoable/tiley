@@ -141,4 +141,11 @@ struct GridCalculatorTests {
         let frameNormal = GridCalculator.frame(for: normal, in: visibleFrame, rows: 6, columns: 6, gap: 0)
         #expect(frameReversed == frameNormal)
     }
+
+    @Test("empty selection produces zero frame")
+    func emptySelectionProducesZeroFrame() {
+        let visibleFrame = CGRect(x: 0, y: 0, width: 600, height: 600)
+        let frame = GridCalculator.frame(for: LayoutPreset.emptySelection, in: visibleFrame, rows: 6, columns: 6, gap: 0)
+        #expect(frame == .zero)
+    }
 }

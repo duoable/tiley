@@ -2704,6 +2704,46 @@ struct MainWindowView: View {
                         appState.setShortcutRecordingActive(true)
                     }
                 }
+
+                if isEditing && !isAdding && !isReplacing {
+                    AddShortcutButton(
+                        colorScheme: colorScheme,
+                        tooltip: preset.toggleToMinimize
+                            ? NSLocalizedString("Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable.", comment: "Tooltip for toggle minimize button when enabled")
+                            : NSLocalizedString("Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized.", comment: "Tooltip for toggle minimize button when disabled")
+                    ) {
+                        HStack(spacing: 3) {
+                            Image(systemName: preset.toggleToMinimize ? "minus.rectangle.fill" : "minus.rectangle")
+                                .font(.system(size: 9, weight: .semibold))
+                            if preset.toggleToMinimize {
+                                Text(NSLocalizedString("Toggle", comment: "Badge label for toggle minimize option"))
+                                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            }
+                        }
+                        .foregroundStyle(preset.toggleToMinimize ? Color.accentColor : Color.secondary)
+                    } action: {
+                        appState.updateLayoutPreset(preset.id) { p in
+                            p.toggleToMinimize.toggle()
+                        }
+                    }
+                } else if !isEditing && preset.toggleToMinimize {
+                    HStack(spacing: 2) {
+                        Image(systemName: "minus.rectangle.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 3)
+                    .foregroundStyle(Color.accentColor)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(Color.accentColor.opacity(0.12))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .stroke(Color.accentColor.opacity(0.3), lineWidth: 0.5)
+                    )
+                    .instantTooltip(NSLocalizedString("Toggle to minimize: enabled", comment: "Tooltip for toggle minimize indicator badge"))
+                }
             }
 
             if isAdding {
