@@ -102,31 +102,54 @@ extension AppState {
             requestAccessibilityAccess()
             return
         }
-        // Wait for the authoritative window list before picking targets.
-        if deferUntilWindowListReady({ [weak self] in self?.applyLayoutPreset(id: id) }) { return }
-        let target: WindowTarget
-        if let existing = activeLayoutTarget {
-            target = existing
-        } else {
-            guard let resolved = resolveWindowTarget() else { return }
-            target = resolved
-        }
-
-        activeLayoutTarget = target
-        lastTargetPID = target.processIdentifier
         selectedLayoutPresetID = id
 
-        if handleTogglePresetIfApplicable(preset: preset, target: target) {
+        // Wait for the authoritative window list before picking targets.
+        if deferUntilWindowListReady({ [weak self] in self?.applyLayoutPreset(id: id) }) { return }
+
+        // If the preset has app assignments and any assigned app window is minimized, restore it:
+        let rectangleApps = preset.normalizedRectangleApps
+        let hasAppAssignment = rectangleApps.contains(where: { $0 != nil })
+        if hasAppAssignment && canRestoreMinimizedWindows(for: preset) {
+            restorePresetMinimizedWindows(preset: preset)
             return
         }
 
-        if let next = targetScreenForPreset(id: id, currentTarget: target) {
-            applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+        // If frontmost application has no standard windows (e.g. user clicked desktop) and there are minimized windows to restore:
+        if canRestoreMinimizedWindows(for: preset) {
+            let frontmostPID = AccessibilityService.focusedApplicationPID() ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
+            let frontmostHasStandardWindow = frontmostPID.map { $0 != getpid() && accessibilityService.hasStandardWindow(for: $0) } ?? false
+
+            if !frontmostHasStandardWindow {
+                restorePresetMinimizedWindows(preset: preset)
+                return
+            }
+        }
+
+        let target: WindowTarget? = activeLayoutTarget ?? resolveWindowTarget()
+        if let target {
+            activeLayoutTarget = target
+            lastTargetPID = target.processIdentifier
+
+            if handleTogglePresetIfApplicable(preset: preset, target: target) {
+                return
+            }
+
+            if let next = targetScreenForPreset(id: id, currentTarget: target) {
+                applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+                return
+            }
+
+            executePresetLayout(preset: preset, target: target)
+            TelemetryDeck.signal("presetApplied", parameters: ["presetName": preset.name])
             return
         }
 
-        executePresetLayout(preset: preset, target: target)
-        TelemetryDeck.signal("presetApplied", parameters: ["presetName": preset.name])
+        // When there is NO active on-screen window target, restore minimized window(s) for this preset:
+        if canRestoreMinimizedWindows(for: preset) {
+            restorePresetMinimizedWindows(preset: preset)
+            return
+        }
     }
 
     func executePresetLayout(preset: LayoutPreset, target: WindowTarget) {
@@ -134,8 +157,12 @@ extension AppState {
             if let win = target.windowElement {
                 accessibilityService.minimizeWindow(win)
             }
-            presetMinimizedWindows[preset.id] = [PresetWindowRecord(cgWindowID: target.cgWindowID, pid: target.processIdentifier, windowElement: target.windowElement)]
-            finalizeLayoutApplication()
+            let rec = PresetWindowRecord(cgWindowID: target.cgWindowID, pid: target.processIdentifier, windowElement: target.windowElement)
+            presetMinimizedBatches[preset.id, default: []].append([rec])
+            presetMinimizedWindows[preset.id] = [rec]
+            dismissOverlayImmediately()
+            orderOutAllMainWindows()
+            finalizeLayoutApplication(clearingTargetPID: true)
             return
         }
 
@@ -177,6 +204,157 @@ extension AppState {
 
     // MARK: - Toggle to Minimize / Restore
 
+    /// Returns `true` if this preset has windows that were minimized (or assigned app windows that are minimized)
+    /// and should be restored back to the screen.
+    func canRestoreMinimizedWindows(for preset: LayoutPreset) -> Bool {
+        guard preset.toggleToMinimize else { return false }
+
+        if let batches = presetMinimizedBatches[preset.id], !batches.isEmpty {
+            for batch in batches {
+                for rec in batch {
+                    if let win = rec.windowElement, accessibilityService.isWindowMinimized(win) {
+                        return true
+                    }
+                    if !accessibilityService.minimizedWindows(for: rec.pid).isEmpty {
+                        return true
+                    }
+                }
+            }
+        } else if let recorded = presetMinimizedWindows[preset.id], !recorded.isEmpty {
+            for rec in recorded {
+                if let win = rec.windowElement, accessibilityService.isWindowMinimized(win) {
+                    return true
+                }
+                if !accessibilityService.minimizedWindows(for: rec.pid).isEmpty {
+                    return true
+                }
+            }
+        }
+
+        let rectangleApps = preset.normalizedRectangleApps
+        if rectangleApps.contains(where: { $0 != nil }) {
+            for maybeBID in rectangleApps {
+                guard let bid = maybeBID else { continue }
+                guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else { continue }
+                if !accessibilityService.minimizedWindows(for: app.processIdentifier).isEmpty {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    /// Activates the application for `pid`, unminimizes the specified window (or all minimized windows of that app),
+    /// and raises them forward.
+    func unminimizeAndActivateApp(pid: pid_t, windowElement: AXUIElement? = nil) {
+        guard let app = NSRunningApplication(processIdentifier: pid) else { return }
+        _ = app.activate()
+
+        if let windowElement {
+            accessibilityService.unminimizeWindow(windowElement)
+            accessibilityService.raiseWindow(windowElement)
+        }
+
+        for win in accessibilityService.minimizedWindows(for: pid) {
+            accessibilityService.unminimizeWindow(win)
+            accessibilityService.raiseWindow(win)
+        }
+
+        if !accessibilityService.minimizedWindows(for: pid).isEmpty, let appName = app.localizedName {
+            let scriptSource = "tell application \"\(appName)\" to set miniaturized of windows to false"
+            if let script = NSAppleScript(source: scriptSource) {
+                var err: NSDictionary?
+                _ = script.executeAndReturnError(&err)
+            }
+        }
+    }
+
+    /// Restores (unminimizes) any minimized windows for this preset and, if the preset is non-empty,
+    /// places them back in their preset layout.
+    @discardableResult
+    func restorePresetMinimizedWindows(
+        preset: LayoutPreset,
+        visibleFrame: CGRect? = nil,
+        screenFrame: CGRect? = nil
+    ) -> Bool {
+        guard canRestoreMinimizedWindows(for: preset) else { return false }
+
+        let presetID = preset.id
+        var pidsToRestore: [pid_t] = []
+        var elementsToRestore: [(pid_t, AXUIElement?)] = []
+
+        // Pop the latest batch from presetMinimizedBatches stack
+        if var batches = presetMinimizedBatches[presetID], !batches.isEmpty {
+            let lastBatch = batches.removeLast()
+            presetMinimizedBatches[presetID] = batches.isEmpty ? nil : batches
+            presetMinimizedWindows[presetID] = batches.last
+            for rec in lastBatch {
+                pidsToRestore.append(rec.pid)
+                elementsToRestore.append((rec.pid, rec.windowElement))
+            }
+        } else if let recorded = presetMinimizedWindows[presetID], !recorded.isEmpty {
+            presetMinimizedWindows[presetID] = nil
+            for rec in recorded {
+                pidsToRestore.append(rec.pid)
+                elementsToRestore.append((rec.pid, rec.windowElement))
+            }
+        }
+
+        let rectangleApps = preset.normalizedRectangleApps
+        if rectangleApps.contains(where: { $0 != nil }) {
+            for maybeBID in rectangleApps {
+                guard let bid = maybeBID else { continue }
+                guard let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bid }) else { continue }
+                if !pidsToRestore.contains(app.processIdentifier) {
+                    pidsToRestore.append(app.processIdentifier)
+                    elementsToRestore.append((app.processIdentifier, nil))
+                }
+            }
+        }
+
+        guard !elementsToRestore.isEmpty else { return false }
+
+        for (pid, el) in elementsToRestore {
+            unminimizeAndActivateApp(pid: pid, windowElement: el)
+        }
+
+        dismissOverlayImmediately()
+        orderOutAllMainWindows()
+
+        guard let targetPID = pidsToRestore.first else {
+            finalizeLayoutApplication()
+            return true
+        }
+
+        lastTargetPID = targetPID
+
+        if preset.isEmpty {
+            activeLayoutTarget = nil
+            clearWindowCyclingState(animateRestore: true)
+            return true
+        }
+
+        // For non-empty presets, wait 120ms for WindowServer to finish restoring the window on screen,
+        // then apply the preset layout to the unminimized window.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard let self else { return }
+            let unminTarget = self.windowManager?.captureFocusedWindow(preferredPID: targetPID)
+                ?? self.resolveWindowTarget()
+            if let unminTarget {
+                self.activeLayoutTarget = unminTarget
+                self.lastTargetPID = unminTarget.processIdentifier
+                if let visibleFrame, let screenFrame {
+                    self.applyLayoutPresetOnScreen(id: presetID, visibleFrame: visibleFrame, screenFrame: screenFrame)
+                } else {
+                    self.executePresetLayout(preset: preset, target: unminTarget)
+                }
+            }
+        }
+
+        return true
+    }
+
     /// Checks whether the preset should toggle (minimize or unminimize) instead of performing standard layout.
     /// Returns `true` if a toggle action was executed.
     @discardableResult
@@ -186,53 +364,9 @@ extension AppState {
 
         let presetID = preset.id
 
-        // Phase 1: Unminimize check.
-        // If we previously minimized windows for this preset and any of them are still minimized, restore them.
-        if let recorded = presetMinimizedWindows[presetID], !recorded.isEmpty {
-            var anyStillMinimized = false
-            for rec in recorded {
-                if let element = rec.windowElement, accessibilityService.isWindowMinimized(element) {
-                    anyStillMinimized = true
-                    break
-                }
-                if !accessibilityService.minimizedWindows(for: rec.pid).isEmpty {
-                    anyStillMinimized = true
-                    break
-                }
-            }
+        // When target is an active on-screen window, the preset acts directly on target.
+        // It does not unminimize previously minimized windows while an active target is present.
 
-            if anyStillMinimized {
-                for rec in recorded {
-                    if let element = rec.windowElement {
-                        accessibilityService.unminimizeWindow(element)
-                        accessibilityService.raiseWindow(element)
-                    } else {
-                        for win in accessibilityService.minimizedWindows(for: rec.pid) {
-                            accessibilityService.unminimizeWindow(win)
-                            accessibilityService.raiseWindow(win)
-                        }
-                    }
-                    NSRunningApplication(processIdentifier: rec.pid)?.activate()
-                }
-
-                presetMinimizedWindows[presetID] = nil
-                dismissOverlayImmediately()
-                orderOutAllMainWindows()
-
-                if !preset.isEmpty {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                        guard let self else { return }
-                        self.activeLayoutTarget = target
-                        self.executePresetLayout(preset: preset, target: target)
-                    }
-                } else {
-                    finalizeLayoutApplication()
-                }
-                return true
-            }
-        }
-
-        // Phase 2: Minimize check.
         // If the preset is completely empty (no tiles selected):
         if preset.isEmpty {
             let targetsToMinimize: [WindowTarget]
@@ -254,11 +388,12 @@ extension AppState {
                 records.append(PresetWindowRecord(cgWindowID: t.cgWindowID, pid: t.processIdentifier, windowElement: t.windowElement))
             }
 
+            presetMinimizedBatches[presetID, default: []].append(records)
             presetMinimizedWindows[presetID] = records
             presetPlacedWindows[presetID] = nil
             dismissOverlayImmediately()
             orderOutAllMainWindows()
-            finalizeLayoutApplication()
+            finalizeLayoutApplication(clearingTargetPID: true)
             return true
         }
 
@@ -361,11 +496,13 @@ extension AppState {
                 records.append(PresetWindowRecord(cgWindowID: t.cgWindowID, pid: t.processIdentifier, windowElement: t.windowElement))
             }
 
+            presetMinimizedBatches[presetID, default: []].append(records)
             presetMinimizedWindows[presetID] = records
             presetPlacedWindows[presetID] = nil
+            lastPresetPlacement = nil
             dismissOverlayImmediately()
             orderOutAllMainWindows()
-            finalizeLayoutApplication()
+            finalizeLayoutApplication(clearingTargetPID: true)
             return true
         }
 
@@ -375,6 +512,9 @@ extension AppState {
     /// Applies a layout preset on the screen where the mouse cursor is located.
     /// Falls back to the target window's screen when the cursor screen cannot be determined.
     func applyPresetOnMouseScreen(id: UUID) {
+        guard let preset = layoutPreset(for: id) else { return }
+        selectedLayoutPresetID = id
+
         let mouseLocation = NSEvent.mouseLocation
         let baseScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
         guard let baseScreen else {
@@ -382,24 +522,40 @@ extension AppState {
             return
         }
 
-        let target: WindowTarget
-        if let existing = activeLayoutTarget {
-            target = existing
-        } else if let resolved = resolveWindowTarget() {
-            target = resolved
-        } else {
-            applyLayoutPresetOnScreen(id: id, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+        let rectangleApps = preset.normalizedRectangleApps
+        let hasAppAssignment = rectangleApps.contains(where: { $0 != nil })
+        if hasAppAssignment && canRestoreMinimizedWindows(for: preset) {
+            restorePresetMinimizedWindows(preset: preset, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
             return
         }
 
-        activeLayoutTarget = target
-        lastTargetPID = target.processIdentifier
-        selectedLayoutPresetID = id
+        if canRestoreMinimizedWindows(for: preset) {
+            let frontmostPID = AccessibilityService.focusedApplicationPID() ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
+            let frontmostHasStandardWindow = frontmostPID.map { $0 != getpid() && accessibilityService.hasStandardWindow(for: $0) } ?? false
 
-        if let next = targetScreenForPreset(id: id, currentTarget: target, on: baseScreen) {
-            applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
-        } else {
-            applyLayoutPresetOnScreen(id: id, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+            if !frontmostHasStandardWindow {
+                restorePresetMinimizedWindows(preset: preset, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+                return
+            }
+        }
+
+        let target: WindowTarget? = activeLayoutTarget ?? resolveWindowTarget()
+        if let target {
+            activeLayoutTarget = target
+            lastTargetPID = target.processIdentifier
+            selectedLayoutPresetID = id
+
+            if let next = targetScreenForPreset(id: id, currentTarget: target, on: baseScreen) {
+                applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+            } else {
+                applyLayoutPresetOnScreen(id: id, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+            }
+            return
+        }
+
+        if canRestoreMinimizedWindows(for: preset) {
+            restorePresetMinimizedWindows(preset: preset, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+            return
         }
     }
 

@@ -502,6 +502,8 @@ final class AppState: NSObject, NSMenuDelegate {
     @ObservationIgnored var lastPresetPlacement: (windowID: CGWindowID, presetID: UUID, displayID: CGDirectDisplayID, frame: CGRect)?
     /// Windows minimized by presets when toggled to minimize.
     @ObservationIgnored var presetMinimizedWindows: [UUID: [PresetWindowRecord]] = [:]
+    /// Batches of windows minimized by presets, organized as a stack.
+    @ObservationIgnored var presetMinimizedBatches: [UUID: [[PresetWindowRecord]]] = [:]
     /// Windows last placed by presets.
     @ObservationIgnored var presetPlacedWindows: [UUID: [CGWindowID]] = [:]
 
@@ -2199,83 +2201,105 @@ final class AppState: NSObject, NSMenuDelegate {
             requestAccessibilityAccess()
             return
         }
+
         // Wait for the authoritative window list before picking targets.
         if deferUntilWindowListReady({ [weak self] in
             self?.applyLayoutPresetOnScreen(id: id, visibleFrame: visibleFrame, screenFrame: screenFrame)
         }) { return }
-        var target: WindowTarget
-        if let existing = activeLayoutTarget {
-            target = existing
-        } else {
-            guard let resolved = resolveWindowTarget() else { return }
-            target = resolved
-        }
-        if target.isHidden {
-            // Unhiding a placeholder target pumps the run loop for ~150 ms
-            // (`unhideAppIfNeeded`); take Tiley's windows off screen first so
-            // the overlay doesn't visibly linger through it.
-            orderOutAllMainWindows()
-        }
-        target = unhideAppIfNeeded(target)
 
-        activeLayoutTarget = target
-        lastTargetPID = target.processIdentifier
-
-        if handleTogglePresetIfApplicable(preset: preset, target: target) {
-            return
-        }
-
-        guard !preset.isEmpty else {
-            finalizeLayoutApplication()
-            return
-        }
-
-        // If the preset has any app assignment, route through the
-        // assignment-aware async pipeline (matches applyLayoutPreset).
         let rectangleApps = preset.normalizedRectangleApps
-        if rectangleApps.contains(where: { $0 != nil }) {
-            let allSelections = preset.allScaledSelections(toRows: rows, columns: columns)
-            var anchor = target
-            anchor = WindowTarget(
-                appElement: anchor.appElement,
-                windowElement: anchor.windowElement,
-                processIdentifier: anchor.processIdentifier,
-                appName: anchor.appName,
-                windowTitle: anchor.windowTitle,
-                frame: anchor.frame,
-                visibleFrame: visibleFrame,
-                screenFrame: screenFrame,
-                isHidden: anchor.isHidden,
-                spaceID: anchor.spaceID,
-                isOnOtherSpace: anchor.isOnOtherSpace,
-                cgWindowID: anchor.cgWindowID
-            )
-            Task { @MainActor [self] in
-                await applyPresetWithAppAssignments(
-                    presetID: id,
-                    allSelections: allSelections,
-                    rectangleApps: rectangleApps,
-                    groupedPairs: preset.groupedPairs,
-                    anchorTarget: anchor,
-                    presetName: preset.name
-                )
-            }
+        let hasAppAssignment = rectangleApps.contains(where: { $0 != nil })
+        if hasAppAssignment && canRestoreMinimizedWindows(for: preset) {
+            restorePresetMinimizedWindows(preset: preset, visibleFrame: visibleFrame, screenFrame: screenFrame)
             return
         }
 
-        let selection = preset.scaledSelection(toRows: rows, columns: columns)
-        let secondarySelections = preset.scaledSecondarySelections(toRows: rows, columns: columns)
-        commitLayoutSelectionOnScreen(selection, secondarySelections: secondarySelections, visibleFrame: visibleFrame, screenFrame: screenFrame, groupedPairs: preset.groupedPairs)
+        if canRestoreMinimizedWindows(for: preset) {
+            let frontmostPID = AccessibilityService.focusedApplicationPID() ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
+            let frontmostHasStandardWindow = frontmostPID.map { $0 != getpid() && accessibilityService.hasStandardWindow(for: $0) } ?? false
+
+            if !frontmostHasStandardWindow {
+                restorePresetMinimizedWindows(preset: preset, visibleFrame: visibleFrame, screenFrame: screenFrame)
+                return
+            }
+        }
+
+        let target: WindowTarget? = activeLayoutTarget ?? resolveWindowTarget()
+        if let targetVal = target {
+            var actualTarget = targetVal
+            if actualTarget.isHidden {
+                orderOutAllMainWindows()
+            }
+            actualTarget = unhideAppIfNeeded(actualTarget)
+
+            activeLayoutTarget = actualTarget
+            lastTargetPID = actualTarget.processIdentifier
+
+            if handleTogglePresetIfApplicable(preset: preset, target: actualTarget) {
+                return
+            }
+
+            guard !preset.isEmpty else {
+                finalizeLayoutApplication(clearingTargetPID: true)
+                return
+            }
+
+            // If the preset has any app assignment, route through the
+            // assignment-aware async pipeline (matches applyLayoutPreset).
+            if hasAppAssignment {
+                let allSelections = preset.allScaledSelections(toRows: rows, columns: columns)
+                var anchor = actualTarget
+                anchor = WindowTarget(
+                    appElement: anchor.appElement,
+                    windowElement: anchor.windowElement,
+                    processIdentifier: anchor.processIdentifier,
+                    appName: anchor.appName,
+                    windowTitle: anchor.windowTitle,
+                    frame: anchor.frame,
+                    visibleFrame: visibleFrame,
+                    screenFrame: screenFrame,
+                    isHidden: anchor.isHidden,
+                    spaceID: anchor.spaceID,
+                    isOnOtherSpace: anchor.isOnOtherSpace,
+                    cgWindowID: anchor.cgWindowID
+                )
+                Task { @MainActor [self] in
+                    await applyPresetWithAppAssignments(
+                        presetID: id,
+                        allSelections: allSelections,
+                        rectangleApps: rectangleApps,
+                        groupedPairs: preset.groupedPairs,
+                        anchorTarget: anchor,
+                        presetName: preset.name
+                    )
+                }
+                return
+            }
+
+            let selection = preset.scaledSelection(toRows: rows, columns: columns)
+            let secondarySelections = preset.scaledSecondarySelections(toRows: rows, columns: columns)
+            commitLayoutSelectionOnScreen(selection, secondarySelections: secondarySelections, visibleFrame: visibleFrame, screenFrame: screenFrame, groupedPairs: preset.groupedPairs)
+        } else {
+            // When there is NO active on-screen window target, restore minimized window(s) for this preset:
+            if canRestoreMinimizedWindows(for: preset) {
+                restorePresetMinimizedWindows(preset: preset, visibleFrame: visibleFrame, screenFrame: screenFrame)
+                return
+            }
+        }
     }
 
     /// Common tail of every layout application: drops the active target,
     /// re-activates the target app, and restores cycling state.
     /// (hidePreviewOverlay / isShowingLayoutGrid / hideAllMainWindows are
     /// already handled by the caller before the resize for faster feedback.)
-    func finalizeLayoutApplication() {
+    func finalizeLayoutApplication(clearingTargetPID: Bool = false) {
         activeLayoutTarget = nil
         clearResizabilityCache()
-        _ = reactivateLastTargetApp(clearingState: false)
+        if clearingTargetPID {
+            lastTargetPID = nil
+        } else {
+            _ = reactivateLastTargetApp(clearingState: false)
+        }
         clearWindowCyclingState(animateRestore: true)
     }
 

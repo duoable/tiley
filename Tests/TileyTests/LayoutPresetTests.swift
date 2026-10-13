@@ -250,5 +250,52 @@ struct LayoutPresetTests {
         #expect(preset.isEmpty == true)
         #expect(preset.allSelections.isEmpty)
     }
+
+    @Test("canRestoreMinimizedWindows requires toggleToMinimize true")
+    @MainActor
+    func canRestoreRequiresToggleToMinimize() {
+        let appState = AppState()
+        let presetWithoutToggle = LayoutPreset(
+            id: UUID(),
+            name: "Empty Without Toggle",
+            selection: LayoutPreset.emptySelection,
+            baseRows: 6,
+            baseColumns: 6,
+            shortcuts: [],
+            toggleToMinimize: false
+        )
+        appState.presetMinimizedBatches[presetWithoutToggle.id] = [[
+            PresetWindowRecord(cgWindowID: 100, pid: 100, windowElement: nil)
+        ]]
+        #expect(appState.canRestoreMinimizedWindows(for: presetWithoutToggle) == false)
+
+        let presetWithToggle = LayoutPreset(
+            id: UUID(),
+            name: "Empty With Toggle",
+            selection: LayoutPreset.emptySelection,
+            baseRows: 6,
+            baseColumns: 6,
+            shortcuts: [],
+            toggleToMinimize: true
+        )
+        // With no actually running/minimized window elements, returns false safely
+        #expect(appState.canRestoreMinimizedWindows(for: presetWithToggle) == false)
+    }
+
+    @Test("presetMinimizedBatches preserves LIFO order on pop")
+    @MainActor
+    func presetMinimizedBatchesLIFOPop() {
+        let appState = AppState()
+        let presetID = UUID()
+        let rec1 = PresetWindowRecord(cgWindowID: 101, pid: 101, windowElement: nil)
+        let rec2 = PresetWindowRecord(cgWindowID: 102, pid: 102, windowElement: nil)
+        appState.presetMinimizedBatches[presetID] = [[rec1], [rec2]]
+
+        var batches = appState.presetMinimizedBatches[presetID]!
+        let lastBatch = batches.removeLast()
+        #expect(lastBatch.first?.cgWindowID == 102)
+        #expect(batches.count == 1)
+        #expect(batches.first?.first?.cgWindowID == 101)
+    }
 }
 

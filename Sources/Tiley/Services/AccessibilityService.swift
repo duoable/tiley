@@ -923,20 +923,23 @@ final class AccessibilityService {
     @discardableResult
     func minimizeWindow(_ window: AXUIElement) -> Bool {
         let err = AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
-        if err == .success { return true }
+        if err == .success && isWindowMinimized(window) { return true }
         var minButton: AnyObject?
         let buttonResult = AXUIElementCopyAttributeValue(window, kAXMinimizeButtonAttribute as CFString, &minButton)
         if buttonResult == .success, let button = minButton {
-            return AXUIElementPerformAction(button as! AXUIElement, kAXPressAction as CFString) == .success
+            let pressErr = AXUIElementPerformAction(button as! AXUIElement, kAXPressAction as CFString)
+            if pressErr == .success { return true }
         }
-        return false
+        return isWindowMinimized(window)
     }
 
     /// Restores (unminimizes) a window from the Dock.
     @discardableResult
     func unminimizeWindow(_ window: AXUIElement) -> Bool {
         let err = AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
-        return err == .success
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        if err == .success || !isWindowMinimized(window) { return true }
+        return false
     }
 
     /// Returns `true` if the window is currently minimized.
@@ -951,6 +954,15 @@ final class AccessibilityService {
         let appElement = AXUIElementCreateApplication(pid)
         guard let axWindows = try? copyAllWindowElements(from: appElement) else { return [] }
         return axWindows.filter { isWindowMinimized($0) }
+    }
+
+    /// Returns `true` if the application with the given PID has at least one unminimized standard window.
+    func hasStandardWindow(for pid: pid_t) -> Bool {
+        let appElement = AXUIElementCreateApplication(pid)
+        guard let axWindows = try? copyAllWindowElements(from: appElement) else { return false }
+        return axWindows.contains { w in
+            !isWindowMinimized(w) && readWindowSummary(w)?.subrole == "AXStandardWindow"
+        }
     }
 
     /// Returns all on-screen standard windows (excluding Tiley) in z-order (front to back).
