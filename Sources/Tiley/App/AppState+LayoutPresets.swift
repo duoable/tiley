@@ -114,6 +114,13 @@ extension AppState {
 
         activeLayoutTarget = target
         lastTargetPID = target.processIdentifier
+        selectedLayoutPresetID = id
+
+        if let next = targetScreenForPreset(id: id, currentTarget: target) {
+            applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+            return
+        }
+
         let allSelections = preset.allScaledSelections(toRows: rows, columns: columns)
         let rectangleApps = preset.normalizedRectangleApps
         let hasAnyAssignment = rectangleApps.contains(where: { $0 != nil })
@@ -155,11 +162,93 @@ extension AppState {
     /// Falls back to the target window's screen when the cursor screen cannot be determined.
     func applyPresetOnMouseScreen(id: UUID) {
         let mouseLocation = NSEvent.mouseLocation
-        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) }) {
-            applyLayoutPresetOnScreen(id: id, visibleFrame: screen.visibleFrame, screenFrame: screen.frame)
-        } else {
+        let baseScreen = NSScreen.screens.first(where: { $0.frame.contains(mouseLocation) })
+        guard let baseScreen else {
             applyLayoutPreset(id: id)
+            return
         }
+
+        let target: WindowTarget
+        if let existing = activeLayoutTarget {
+            target = existing
+        } else if let resolved = resolveWindowTarget() {
+            target = resolved
+        } else {
+            applyLayoutPresetOnScreen(id: id, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+            return
+        }
+
+        activeLayoutTarget = target
+        lastTargetPID = target.processIdentifier
+        selectedLayoutPresetID = id
+
+        if let next = targetScreenForPreset(id: id, currentTarget: target, on: baseScreen) {
+            applyLayoutPresetOnScreen(id: id, visibleFrame: next.visibleFrame, screenFrame: next.frame)
+        } else {
+            applyLayoutPresetOnScreen(id: id, visibleFrame: baseScreen.visibleFrame, screenFrame: baseScreen.frame)
+        }
+    }
+
+    // MARK: - Display Cycling on Repeated Shortcut
+
+    /// Returns true if two window frames match within a small point tolerance.
+    nonisolated static func isWindowFrame(_ current: CGRect, approximatelyMatching target: CGRect, tolerance: CGFloat = 3.0) -> Bool {
+        abs(current.minX - target.minX) <= tolerance &&
+        abs(current.minY - target.minY) <= tolerance &&
+        abs(current.width - target.width) <= tolerance &&
+        abs(current.height - target.height) <= tolerance
+    }
+
+    /// Returns the next display in physical arrangement order (or connected displays order).
+    func nextScreen(after currentScreen: NSScreen) -> NSScreen? {
+        let resolver = displayFingerprintResolverForHotKeys()
+        let sortedScreens = resolver.displays.map(\.screen)
+        let screens = !sortedScreens.isEmpty ? sortedScreens : NSScreen.screens
+        guard screens.count > 1 else { return nil }
+
+        let currentIndex = screens.firstIndex(where: { $0.displayID == currentScreen.displayID }) ?? 0
+        let nextIndex = (currentIndex + 1) % screens.count
+        return screens[nextIndex]
+    }
+
+    /// When `cycleDisplaysOnRepeatedShortcut` is enabled and the target window is already in the layout preset's position
+    /// on its current screen, returns the next display to cycle to. Otherwise returns nil.
+    func targetScreenForPreset(id: UUID, currentTarget: WindowTarget, on preferredScreen: NSScreen? = nil) -> NSScreen? {
+        guard cycleDisplaysOnRepeatedShortcut else { return nil }
+        guard NSScreen.screens.count > 1 else { return nil }
+        guard let preset = layoutPreset(for: id) else { return nil }
+
+        let currentScreen: NSScreen
+        if let preferred = preferredScreen {
+            currentScreen = preferred
+        } else if let matching = NSScreen.screens.first(where: { $0.frame == currentTarget.screenFrame }) {
+            currentScreen = matching
+        } else {
+            currentScreen = NSScreen.screens.max(by: { a, b in
+                a.frame.intersection(currentTarget.frame).area < b.frame.intersection(currentTarget.frame).area
+            }) ?? NSScreen.screens[0]
+        }
+
+        let primarySelection = preset.allScaledSelections(toRows: rows, columns: columns).first
+            ?? preset.scaledSelection(toRows: rows, columns: columns)
+        let expectedFrame = GridCalculator.frame(
+            for: primarySelection,
+            in: currentScreen.visibleFrame,
+            rows: rows,
+            columns: columns,
+            gap: gap
+        )
+
+        let isAtExpected = Self.isWindowFrame(currentTarget.frame, approximatelyMatching: expectedFrame)
+        let isAtRecordedConstrained = lastPresetPlacement?.windowID == currentTarget.cgWindowID
+            && lastPresetPlacement?.presetID == id
+            && lastPresetPlacement?.displayID == currentScreen.displayID
+            && Self.isWindowFrame(currentTarget.frame, approximatelyMatching: lastPresetPlacement!.frame)
+
+        if isAtExpected || isAtRecordedConstrained {
+            return nextScreen(after: currentScreen)
+        }
+        return nil
     }
 
     func handleLocalShortcut(_ shortcut: HotKeyShortcut) -> Bool {

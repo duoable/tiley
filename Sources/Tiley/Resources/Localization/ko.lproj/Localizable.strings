@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "%@을(를) 실행했지만 윈도우를 찾지 못했습니다.";
 "Restore Default Layouts" = "기본 레이아웃 복원";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "모든 레이아웃 프리셋을 기본값으로 되돌리시겠습니까? 사용자 정의 레이아웃이 삭제됩니다.";
+"Cycle displays on repeated shortcut" = "단축키 재입력 시 디스플레이 순환";

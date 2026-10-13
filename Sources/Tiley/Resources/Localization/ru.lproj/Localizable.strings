@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "Не удалось найти окно для %@ после запуска.";
 "Restore Default Layouts" = "Восстановить компоновки по умолчанию";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "Вы уверены, что хотите сбросить все компоновки к значениям по умолчанию? Пользовательские компоновки будут удалены.";
+"Cycle displays on repeated shortcut" = "Переключать экраны при повторном нажатии сочетания клавиш";

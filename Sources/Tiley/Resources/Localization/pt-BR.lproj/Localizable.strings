@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "Não foi possível encontrar uma janela para %@ após iniciar.";
 "Restore Default Layouts" = "Restaurar layouts padrão";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "Tem certeza de que deseja redefinir todos os layouts predefinidos para os padrões? Os layouts personalizados serão removidos.";
+"Cycle displays on repeated shortcut" = "Alternar telas ao repetir atalho";

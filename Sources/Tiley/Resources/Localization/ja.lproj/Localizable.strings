@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "%@ を起動しましたが、ウインドウが見つかりませんでした。";
 "Restore Default Layouts" = "デフォルトのレイアウトに戻す";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "すべてのレイアウトプリセットを初期状態に戻してもよろしいですか？カスタムレイアウトは削除されます。";
+"Cycle displays on repeated shortcut" = "ショートカット再実行時にディスプレイを巡回";

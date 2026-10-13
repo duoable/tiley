@@ -79,6 +79,7 @@ final class AppState: NSObject, NSMenuDelegate {
         var enableDebugLog: Bool
         var debugSimulateUpdate: Bool
         var displayShortcutSettings: DisplayShortcutSettings
+        var cycleDisplaysOnRepeatedShortcut: Bool
     }
 
     var desktopImageVersion: Int = 0
@@ -207,6 +208,12 @@ final class AppState: NSObject, NSMenuDelegate {
         didSet {
             guard !isLoadingSettings else { return }
             UserDefaults.standard.set(showNearIcon, forKey: UserDefaultsKey.showNearIcon)
+        }
+    }
+    var cycleDisplaysOnRepeatedShortcut = false {
+        didSet {
+            guard !isLoadingSettings else { return }
+            UserDefaults.standard.set(cycleDisplaysOnRepeatedShortcut, forKey: UserDefaultsKey.cycleDisplaysOnRepeatedShortcut)
         }
     }
     var displayShortcutSettings = DisplayShortcutSettings.default
@@ -491,6 +498,8 @@ final class AppState: NSObject, NSMenuDelegate {
     /// frame are treated as echoes and suppressed. This prevents echo events from
     /// hijacking the polling source.
     @ObservationIgnored var recentlySetFrames: [CGWindowID: (frame: CGRect, time: CFAbsoluteTime)] = [:]
+    /// Records the last preset application for display cycling detection (especially for constrained windows).
+    @ObservationIgnored var lastPresetPlacement: (windowID: CGWindowID, presetID: UUID, displayID: CGDirectDisplayID, frame: CGRect)?
 
     /// Windows that have moved/resized via the user (not via Tiley) since the last
     /// settle pass. Drained by `processManuallyMovedWindows()` after the user
@@ -617,7 +626,8 @@ final class AppState: NSObject, NSMenuDelegate {
             showNearIcon: showNearIcon,
             enableDebugLog: enableDebugLog,
             debugSimulateUpdate: debugSimulateUpdate,
-            displayShortcutSettings: displayShortcutSettings
+            displayShortcutSettings: displayShortcutSettings,
+            cycleDisplaysOnRepeatedShortcut: cycleDisplaysOnRepeatedShortcut
         )
     }
 
@@ -1150,6 +1160,9 @@ final class AppState: NSObject, NSMenuDelegate {
         }
         if settings.enableDebugLog != current.enableDebugLog { enableDebugLog = settings.enableDebugLog }
         if settings.debugSimulateUpdate != current.debugSimulateUpdate { debugSimulateUpdate = settings.debugSimulateUpdate }
+        if settings.cycleDisplaysOnRepeatedShortcut != current.cycleDisplaysOnRepeatedShortcut {
+            cycleDisplaysOnRepeatedShortcut = settings.cycleDisplaysOnRepeatedShortcut
+        }
         // Preset shortcuts only conflict with the main shortcut.
         if settings.hotKeyShortcut != current.hotKeyShortcut {
             sanitizePresetGlobalShortcutEligibility()
@@ -2035,6 +2048,10 @@ final class AppState: NSObject, NSMenuDelegate {
             )
             if case .success = result {
                 self.recordTileyPlacedFrames(for: [target.cgWindowID])
+                if let selPresetID = self.selectedLayoutPresetID,
+                   let screen = NSScreen.screens.first(where: { $0.frame == target.screenFrame }) {
+                    self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
+                }
             }
             self.isApplyingGroupTransform = false
             switch result {
@@ -2134,6 +2151,10 @@ final class AppState: NSObject, NSMenuDelegate {
             )
             if case .success = result {
                 self.recordTileyPlacedFrames(for: [target.cgWindowID])
+                if let selPresetID = self.selectedLayoutPresetID,
+                   let screen = NSScreen.screens.first(where: { $0.frame == currentScreenFrame }) {
+                    self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
+                }
             }
             self.isApplyingGroupTransform = false
             switch result {
@@ -2153,6 +2174,7 @@ final class AppState: NSObject, NSMenuDelegate {
     /// Applies a layout preset targeting a specific screen.
     func applyLayoutPresetOnScreen(id: UUID, visibleFrame: CGRect, screenFrame: CGRect) {
         guard let preset = layoutPreset(for: id) else { return }
+        selectedLayoutPresetID = id
         guard accessibilityGranted || accessibilityService.checkAccess(prompt: false) else {
             requestAccessibilityAccess()
             return

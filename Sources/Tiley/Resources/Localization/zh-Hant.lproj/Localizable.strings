@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "啟動後找不到 %@ 的視窗。";
 "Restore Default Layouts" = "還原預設版面";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "確定要將所有版面預設重設為預設值嗎？自訂版面將會被刪除。";
+"Cycle displays on repeated shortcut" = "重複快捷鍵時循環切換顯示器";

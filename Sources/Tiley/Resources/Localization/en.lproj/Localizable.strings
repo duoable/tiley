@@ -160,3 +160,4 @@
 "Couldn't find a window for %@ after launching." = "Couldn't find a window for %@ after launching.";
 "Restore Default Layouts" = "Restore Default Layouts";
 "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed." = "Are you sure you want to reset all layout presets to the defaults? Any custom layouts will be removed.";
+"Cycle displays on repeated shortcut" = "Cycle displays on repeated shortcut";
