@@ -202,18 +202,7 @@ struct SettingsView: View {
                 }
             }
 
-            TahoeSettingsSection(title: NSLocalizedString("Layouts", comment: "Settings section")) {
-                HStack {
-                    Text("Reset the layout preset list to the defaults.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                    Spacer()
-                    Button("Restore Defaults") {
-                        appState.resetLayoutPresetsToDefault()
-                    }
-                    .disabled(isLayoutPresetsAtDefault)
-                }
-            }
+            presetsSection
 
             displayShortcutsSection
 
@@ -436,6 +425,180 @@ struct SettingsView: View {
             current.shortcuts == def.shortcuts
         }
     }
+
+    // MARK: - Presets Section & Import/Export
+
+    private var presetsSection: some View {
+        TahoeSettingsSection(title: NSLocalizedString("Presets", comment: "Settings section")) {
+            VStack(spacing: 0) {
+                TahoeSettingsRow(
+                    label: NSLocalizedString("Export Presets", comment: "Export presets row"),
+                    systemImage: "square.and.arrow.up",
+                    iconAlignment: .center
+                ) {
+                    Button(NSLocalizedString("Export…", comment: "Export button")) {
+                        exportPresets()
+                    }
+                }
+                .padding(.vertical, 4)
+
+                Divider().opacity(0.4)
+
+                TahoeSettingsRow(
+                    label: NSLocalizedString("Import Presets", comment: "Import presets row"),
+                    systemImage: "square.and.arrow.down",
+                    iconAlignment: .center
+                ) {
+                    Button(NSLocalizedString("Import…", comment: "Import button")) {
+                        importPresets()
+                    }
+                }
+                .padding(.vertical, 4)
+
+                Divider().opacity(0.4)
+
+                HStack {
+                    Text(NSLocalizedString("Reset the layout preset list to the defaults.", comment: "Reset preset list note"))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    Spacer()
+                    Button(NSLocalizedString("Restore Defaults", comment: "Restore defaults button title")) {
+                        appState.resetLayoutPresetsToDefault()
+                    }
+                    .disabled(isLayoutPresetsAtDefault)
+                }
+                .padding(.vertical, 4)
+            }
+        }
+    }
+
+    func exportPresets(
+        panelRunner: (NSSavePanel) -> (NSApplication.ModalResponse, URL?) = { ($0.runModal(), $0.url) },
+        alertRunner: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() }
+    ) {
+        let panel = NSSavePanel()
+        panel.title = NSLocalizedString("Export Presets", comment: "Export presets save dialog title")
+        panel.nameFieldStringValue = "tiley-presets.json"
+        panel.allowedContentTypes = [.json]
+        panel.canCreateDirectories = true
+
+        let (response, selectedURL) = panelRunner(panel)
+        guard response == .OK, let url = selectedURL else { return }
+
+        do {
+            let data = try appState.exportPresetsData()
+            try data.write(to: url, options: .atomic)
+        } catch {
+            let alert = Self.makeExportErrorAlert(error: error)
+            _ = alertRunner(alert)
+        }
+    }
+
+    func importPresets(
+        panelRunner: (NSOpenPanel) -> (NSApplication.ModalResponse, URL?) = { ($0.runModal(), $0.url) },
+        optionsAlertRunner: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() },
+        resultAlertRunner: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() },
+        errorAlertRunner: (NSAlert) -> NSApplication.ModalResponse = { $0.runModal() }
+    ) {
+        let panel = NSOpenPanel()
+        panel.title = NSLocalizedString("Import Presets", comment: "Import presets open dialog title")
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        let (response, selectedURL) = panelRunner(panel)
+        guard response == .OK, let url = selectedURL else { return }
+
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            let alert = Self.makeImportErrorAlert(error: error)
+            _ = errorAlertRunner(alert)
+            return
+        }
+
+        let presets: [LayoutPreset]
+        do {
+            presets = try appState.decodePresets(from: data)
+        } catch {
+            let alert = Self.makeImportErrorAlert(error: error)
+            _ = errorAlertRunner(alert)
+            return
+        }
+
+        let optionsAlert = Self.makeImportOptionsAlert(presetCount: presets.count)
+        let responseChoice = optionsAlertRunner(optionsAlert)
+
+        let strategy: PresetImportStrategy
+        if responseChoice == .alertFirstButtonReturn {
+            strategy = .append
+        } else if responseChoice == .alertSecondButtonReturn {
+            strategy = .replace
+        } else {
+            return
+        }
+
+        let result = appState.importPresets(presets, strategy: strategy)
+        let successAlert = Self.makeImportSuccessAlert(result: result)
+        _ = resultAlertRunner(successAlert)
+    }
+
+    static func makeImportOptionsAlert(presetCount: Int) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Import Presets", comment: "Alert title for importing presets")
+        let format = NSLocalizedString(
+            "The file contains %d layout preset(s). Would you like to add them to your existing presets or replace all current presets?",
+            comment: "Alert message asking import strategy"
+        )
+        alert.informativeText = String(format: format, presetCount)
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: NSLocalizedString("Add to Existing", comment: "Add to existing presets button"))
+        alert.addButton(withTitle: NSLocalizedString("Replace All", comment: "Replace all presets button"))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: "Cancel button title"))
+        return alert
+    }
+
+    static func makeImportSuccessAlert(result: PresetImportResult) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Import Succeeded", comment: "Import succeeded alert title")
+        if result.clearedShortcutsCount > 0 {
+            let format = NSLocalizedString(
+                "Successfully imported %d layout preset(s) (%d conflicting shortcut(s) removed).",
+                comment: "Import succeeded with cleared shortcuts message"
+            )
+            alert.informativeText = String(format: format, result.importedCount, result.clearedShortcutsCount)
+        } else {
+            let format = NSLocalizedString(
+                "Successfully imported %d layout preset(s).",
+                comment: "Import succeeded message"
+            )
+            alert.informativeText = String(format: format, result.importedCount)
+        }
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button title"))
+        return alert
+    }
+
+    static func makeImportErrorAlert(error: Error) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Import Failed", comment: "Import failed alert title")
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button title"))
+        return alert
+    }
+
+    static func makeExportErrorAlert(error: Error) -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Export Failed", comment: "Export failed alert title")
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button title"))
+        return alert
+    }
+
 
     private var isShortcutsAtDefault: Bool {
         draftSettings.hotKeyShortcut == .default &&

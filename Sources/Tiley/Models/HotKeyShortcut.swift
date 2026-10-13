@@ -1,7 +1,7 @@
 import AppKit
 import Carbon
 
-struct HotKeyShortcut: Equatable, Codable {
+struct HotKeyShortcut: Equatable, Hashable, Codable {
     var keyCode: UInt32
     var modifiers: UInt32
     var isGlobal: Bool = false
@@ -9,6 +9,12 @@ struct HotKeyShortcut: Equatable, Codable {
     static func == (lhs: HotKeyShortcut, rhs: HotKeyShortcut) -> Bool {
         lhs.keyCode == rhs.keyCode && lhs.modifiers == rhs.modifiers
     }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(keyCode)
+        hasher.combine(modifiers)
+    }
+
 
     enum CodingKeys: String, CodingKey {
         case keyCode

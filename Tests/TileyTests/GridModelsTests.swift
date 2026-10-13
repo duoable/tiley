@@ -80,6 +80,13 @@ struct GridSelectionTests {
         #expect(scaled.endColumn == 0)
         #expect(scaled.endRow == 0)
     }
+
+    @Test("scaling preserves empty sentinel selection")
+    func scalingPreservesEmptySelection() {
+        let empty = LayoutPreset.emptySelection
+        let scaled = empty.scaled(fromRows: 6, columns: 6, toRows: 4, columns: 4)
+        #expect(scaled == LayoutPreset.emptySelection)
+    }
 }
 
 @Suite("GridCalculator")
