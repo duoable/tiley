@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "전역 단축키 추가";
 "Make Global Shortcut" = "전역 단축키로 변경";
 "Make Local Shortcut" = "로컬 단축키로 변경";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "최소화 토글: 활성화됨. 윈도우 배치 후 프리셋을 다시 적용하면 최소화됩니다. 비활성화하려면 클릭하십시오.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "최소화 토글: 비활성화됨. 윈도우 배치와 최소화 간 토글을 활성화하려면 클릭하십시오.";
+"Toggle to minimize: enabled" = "최소화 토글: 활성화됨";
+"Toggle" = "토글";
 "Edit Layout" = "레이아웃 편집";
 "Done Editing" = "편집 완료";
 "Delete Shortcut" = "단축키 삭제";

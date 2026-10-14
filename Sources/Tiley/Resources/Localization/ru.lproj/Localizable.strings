@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Добавить глобальное сочетание";
 "Make Global Shortcut" = "Сделать глобальным сочетанием";
 "Make Local Shortcut" = "Сделать локальным сочетанием";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Сворачивание при повторном нажатии: включено. Повторное применение пресета свернет окна. Нажмите для отключения.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Сворачивание при повторном нажатии: отключено. Нажмите, чтобы переключать окна между расположением и сворачиванием.";
+"Toggle to minimize: enabled" = "Сворачивание при повторном нажатии: включено";
+"Toggle" = "Переключить";
 "Edit Layout" = "Редактировать макет";
 "Done Editing" = "Завершить редактирование";
 "Delete Shortcut" = "Удалить сочетание клавиш";

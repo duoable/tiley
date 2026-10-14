@@ -64,6 +64,13 @@ struct PresetGroupPair: Hashable, Codable {
     }
 }
 
+/// Record of a window tracked during preset minimize / restore toggles.
+struct PresetWindowRecord: Equatable {
+    let cgWindowID: CGWindowID
+    let pid: pid_t
+    let windowElement: AXUIElement?
+}
+
 struct LayoutPreset: Identifiable, Equatable, Codable {
     let id: UUID
     var name: String
@@ -79,6 +86,9 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
     /// identifier, or `nil` for an unassigned slot. Helpers pad/truncate on
     /// access so the effective length always equals `allSelections.count`.
     var rectangleApps: [String?]
+    /// When true, repeatedly applying this preset toggles its windows between
+    /// arranged and minimized.
+    var toggleToMinimize: Bool
 
     /// A sentinel selection used when all selections have been deleted in the editor.
     static let emptySelection = GridSelection(startColumn: -1, startRow: -1, endColumn: -1, endRow: -1)
@@ -88,6 +98,10 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
             return []
         }
         return [selection] + secondarySelections
+    }
+
+    var isEmpty: Bool {
+        allSelections.isEmpty
     }
 
     func allScaledSelections(toRows rows: Int, columns: Int) -> [GridSelection] {
@@ -164,6 +178,7 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
         case globalShortcut
         case groupedPairs
         case rectangleApps
+        case toggleToMinimize
     }
 
     init(
@@ -175,7 +190,8 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
         baseColumns: Int,
         shortcuts: [HotKeyShortcut],
         groupedPairs: [PresetGroupPair] = [],
-        rectangleApps: [String?] = []
+        rectangleApps: [String?] = [],
+        toggleToMinimize: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -186,6 +202,7 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
         self.shortcuts = shortcuts
         self.groupedPairs = groupedPairs
         self.rectangleApps = rectangleApps
+        self.toggleToMinimize = toggleToMinimize
     }
 
     init(from decoder: any Decoder) throws {
@@ -198,6 +215,7 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
         baseColumns = try container.decode(Int.self, forKey: .baseColumns)
         groupedPairs = try container.decodeIfPresent([PresetGroupPair].self, forKey: .groupedPairs) ?? []
         rectangleApps = try container.decodeIfPresent([String?].self, forKey: .rectangleApps) ?? []
+        toggleToMinimize = try container.decodeIfPresent(Bool.self, forKey: .toggleToMinimize) ?? false
 
         // Decode new array format first, fall back to legacy formats
         if let shortcuts = try container.decodeIfPresent([HotKeyShortcut].self, forKey: .shortcuts) {
@@ -239,6 +257,9 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
         let normalizedApps = normalizedRectangleApps
         if normalizedApps.contains(where: { $0 != nil }) {
             try container.encode(normalizedApps, forKey: .rectangleApps)
+        }
+        if toggleToMinimize {
+            try container.encode(true, forKey: .toggleToMinimize)
         }
     }
 
@@ -370,6 +391,9 @@ struct WindowFrameRelative: Equatable {
 
 enum GridCalculator {
     static func frame(for selection: GridSelection, in visibleFrame: CGRect, rows: Int, columns: Int, gap: CGFloat) -> CGRect {
+        guard selection != LayoutPreset.emptySelection else {
+            return .zero
+        }
         let n = selection.normalized
         let totalHorizontalGap = gap * CGFloat(max(0, columns - 1))
         let totalVerticalGap = gap * CGFloat(max(0, rows - 1))

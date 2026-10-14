@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Ajouter un raccourci global";
 "Make Global Shortcut" = "Rendre le raccourci global";
 "Make Local Shortcut" = "Rendre le raccourci local";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Basculer pour réduire : activé. Appuyer à nouveau sur le préréglage réduira les fenêtres. Cliquer pour désactiver.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Basculer pour réduire : désactivé. Cliquer pour basculer entre fenêtres disposées et réduites.";
+"Toggle to minimize: enabled" = "Basculer pour réduire : activé";
+"Toggle" = "Basculer";
 "Edit Layout" = "Modifier la disposition";
 "Done Editing" = "Terminer la modification";
 "Delete Shortcut" = "Supprimer le raccourci";

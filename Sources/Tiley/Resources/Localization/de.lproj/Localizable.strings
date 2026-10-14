@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Globales Kürzel hinzufügen";
 "Make Global Shortcut" = "Als globales Kürzel festlegen";
 "Make Local Shortcut" = "Als lokales Kürzel festlegen";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Umschalten zum Minimieren: aktiviert. Erneutes Anwenden minimiert die Fenster. Klicken zum Deaktivieren.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Umschalten zum Minimieren: deaktiviert. Klicken, um zwischen Anordnen und Minimieren umzuschalten.";
+"Toggle to minimize: enabled" = "Umschalten zum Minimieren: aktiviert";
+"Toggle" = "Umschalten";
 "Edit Layout" = "Layout bearbeiten";
 "Done Editing" = "Bearbeitung abschließen";
 "Delete Shortcut" = "Tastenkürzel löschen";

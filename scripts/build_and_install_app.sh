@@ -42,11 +42,20 @@ echo "Cleaning previous archive: $ARCHIVE_PATH"
 rm -rf "$ARCHIVE_PATH"
 
 echo "Building archive"
+EXTRA_BUILD_ARGS=()
+if [[ -n "${CODE_SIGN_IDENTITY:-}" ]]; then
+  EXTRA_BUILD_ARGS+=(CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY")
+fi
+if [[ -n "${CODE_SIGN_STYLE:-}" ]]; then
+  EXTRA_BUILD_ARGS+=(CODE_SIGN_STYLE="$CODE_SIGN_STYLE")
+fi
+
 xcodebuild \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -configuration "$CONFIGURATION" \
   -archivePath "$ARCHIVE_PATH" \
+  "${EXTRA_BUILD_ARGS[@]}" \
   archive
 
 ARCHIVED_APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME"
@@ -57,6 +66,18 @@ fi
 
 echo "Copying app to $INSTALL_DIR"
 cp -R "$ARCHIVED_APP_PATH" "$INSTALL_DIR/"
+
+if [[ "${CODE_SIGN_IDENTITY:-}" == "-" ]]; then
+  echo "Re-signing embedded frameworks for ad-hoc execution..."
+  if [[ -d "$INSTALLED_APP_PATH/Contents/Frameworks" ]]; then
+    for fw in "$INSTALLED_APP_PATH/Contents/Frameworks"/*.framework; do
+      if [[ -d "$fw" ]]; then
+        codesign --force --sign - "$fw"
+      fi
+    done
+  fi
+  codesign --force --sign - "$INSTALLED_APP_PATH"
+fi
 
 echo "Launching $APP_NAME"
 open "$INSTALLED_APP_PATH"

@@ -15,7 +15,7 @@ import CoreGraphics
 /// for the test runner — but every assertion below verifies the pure
 /// bookkeeping outcome that the runtime depends on.
 @MainActor
-@Suite("WindowAnchorPairs")
+@Suite("WindowAnchorPairs", .serialized)
 final class WindowAnchorPairsTests {
 
     let state: AppState
@@ -53,6 +53,7 @@ final class WindowAnchorPairsTests {
             backing: .buffered,
             defer: false
         )
+        win.isReleasedWhenClosed = false
         win.title = title
         win.makeKeyAndOrderFront(nil)
         // Pump the run loop so the window server registers the window and a

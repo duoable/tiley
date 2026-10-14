@@ -72,6 +72,10 @@
 "Add Global Shortcut" = "Adicionar atalho global";
 "Make Global Shortcut" = "Tornar atalho global";
 "Make Local Shortcut" = "Tornar atalho local";
+"Toggle to minimize: enabled. Pressing the preset again when windows are arranged will minimize them. Click to disable." = "Alternar para minimizar: ativado. Pressionar o ajuste novamente quando as janelas estiverem organizadas irá minimizá-las. Clique para desativar.";
+"Toggle to minimize: disabled. Click to enable toggling windows between arranged and minimized." = "Alternar para minimizar: desativado. Clique para alternar as janelas entre organizadas e minimizadas.";
+"Toggle to minimize: enabled" = "Alternar para minimizar: ativado";
+"Toggle" = "Alternar";
 "Edit Layout" = "Editar layout";
 "Done Editing" = "Concluir edição";
 "Delete Shortcut" = "Excluir atalho";

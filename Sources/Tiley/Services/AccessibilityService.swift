@@ -919,6 +919,52 @@ final class AccessibilityService {
         return actionResult == .success
     }
 
+    /// Minimizes a window to the Dock.
+    @discardableResult
+    func minimizeWindow(_ window: AXUIElement) -> Bool {
+        let err = AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+        if err == .success && isWindowMinimized(window) { return true }
+        var minButton: AnyObject?
+        let buttonResult = AXUIElementCopyAttributeValue(window, kAXMinimizeButtonAttribute as CFString, &minButton)
+        if buttonResult == .success, let button = minButton {
+            let pressErr = AXUIElementPerformAction(button as! AXUIElement, kAXPressAction as CFString)
+            if pressErr == .success { return true }
+        }
+        return isWindowMinimized(window)
+    }
+
+    /// Restores (unminimizes) a window from the Dock.
+    @discardableResult
+    func unminimizeWindow(_ window: AXUIElement) -> Bool {
+        let err = AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        if err == .success || !isWindowMinimized(window) { return true }
+        return false
+    }
+
+    /// Returns `true` if the window is currently minimized.
+    func isWindowMinimized(_ window: AXUIElement) -> Bool {
+        var val: AnyObject?
+        let err = AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &val)
+        return (err == .success) && ((val as? Bool) ?? false)
+    }
+
+    /// Finds all currently minimized windows for the application with the given PID.
+    func minimizedWindows(for pid: pid_t) -> [AXUIElement] {
+        let appElement = AXUIElementCreateApplication(pid)
+        guard let axWindows = try? copyAllWindowElements(from: appElement) else { return [] }
+        return axWindows.filter { isWindowMinimized($0) }
+    }
+
+    /// Returns `true` if the application with the given PID has at least one unminimized standard window.
+    func hasStandardWindow(for pid: pid_t) -> Bool {
+        let appElement = AXUIElementCreateApplication(pid)
+        guard let axWindows = try? copyAllWindowElements(from: appElement) else { return false }
+        return axWindows.contains { w in
+            !isWindowMinimized(w) && readWindowSummary(w)?.subrole == "AXStandardWindow"
+        }
+    }
+
     /// Returns all on-screen standard windows (excluding Tiley) in z-order (front to back).
     /// When `includeOtherSpaces` is true and private CGS APIs are available, also returns
     /// windows from non-current Mission Control spaces with `isOnOtherSpace` set.
