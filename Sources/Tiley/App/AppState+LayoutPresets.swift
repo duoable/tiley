@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import TelemetryDeck
 
 extension AppState {
@@ -791,4 +792,135 @@ extension AppState {
             )
         }
     }
+
+    // MARK: - Export & Import
+
+    /// Encodes current layout presets to formatted JSON Data.
+    func exportPresetsData() throws -> Data {
+        let payload = PresetExportPayload(version: 1, presets: layoutPresets)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(payload)
+    }
+
+    /// Decodes and validates presets from JSON data without modifying state.
+    nonisolated static func decodePresetsData(_ data: Data) throws -> [LayoutPreset] {
+        let decoder = JSONDecoder()
+        if let payload = try? decoder.decode(PresetExportPayload.self, from: data) {
+            guard !payload.presets.isEmpty else { throw PresetImportError.emptyPresets }
+            return payload.presets
+        }
+        if let presets = try? decoder.decode([LayoutPreset].self, from: data) {
+            guard !presets.isEmpty else { throw PresetImportError.emptyPresets }
+            return presets
+        }
+        throw PresetImportError.invalidData
+    }
+
+    /// Decodes and validates presets from JSON data without modifying state.
+    nonisolated func decodePresets(from data: Data) throws -> [LayoutPreset] {
+        try Self.decodePresetsData(data)
+    }
+
+    /// Imports presets using the specified strategy (`.append` or `.replace`).
+    @discardableResult
+    func importPresets(_ presetsToImport: [LayoutPreset], strategy: PresetImportStrategy) -> PresetImportResult {
+        guard !presetsToImport.isEmpty else {
+            return PresetImportResult(importedCount: 0, clearedShortcutsCount: 0)
+        }
+
+        let reservedKeyCodes: Set<UInt32> = [
+            UInt32(kVK_UpArrow),
+            UInt32(kVK_DownArrow),
+            UInt32(kVK_ANSI_Slash)
+        ]
+
+        var clearedShortcuts = 0
+
+        switch strategy {
+        case .replace:
+            var seenIDs = Set<UUID>()
+            var distinctPresets: [LayoutPreset] = []
+            for var preset in presetsToImport {
+                if seenIDs.contains(preset.id) {
+                    preset = LayoutPreset(
+                        id: UUID(),
+                        name: preset.name,
+                        selection: preset.selection,
+                        secondarySelections: preset.secondarySelections,
+                        baseRows: preset.baseRows,
+                        baseColumns: preset.baseColumns,
+                        shortcuts: preset.shortcuts,
+                        groupedPairs: preset.groupedPairs,
+                        rectangleApps: preset.rectangleApps
+                    )
+                }
+                seenIDs.insert(preset.id)
+
+                let before = preset.shortcuts.count
+                preset.shortcuts.removeAll { shortcut in
+                    reservedKeyCodes.contains(shortcut.keyCode) && shortcut.modifiers == 0
+                }
+                clearedShortcuts += (before - preset.shortcuts.count)
+                distinctPresets.append(preset)
+            }
+
+            layoutPresets = distinctPresets
+            sanitizePresetGlobalShortcutEligibility()
+            selectedLayoutPresetID = layoutPresets.first?.id
+            saveLayoutPresets()
+            registerPresetHotKeys()
+            return PresetImportResult(importedCount: distinctPresets.count, clearedShortcutsCount: clearedShortcuts)
+
+        case .append:
+            var existingIDs = Set(layoutPresets.map(\.id))
+            var processedPresets: [LayoutPreset] = []
+            var activePresetShortcuts = Set(layoutPresets.flatMap(\.shortcuts))
+
+            for var preset in presetsToImport {
+                if existingIDs.contains(preset.id) {
+                    preset = LayoutPreset(
+                        id: UUID(),
+                        name: preset.name,
+                        selection: preset.selection,
+                        secondarySelections: preset.secondarySelections,
+                        baseRows: preset.baseRows,
+                        baseColumns: preset.baseColumns,
+                        shortcuts: preset.shortcuts,
+                        groupedPairs: preset.groupedPairs,
+                        rectangleApps: preset.rectangleApps
+                    )
+                }
+                existingIDs.insert(preset.id)
+
+                var validShortcuts: [HotKeyShortcut] = []
+                for shortcut in preset.shortcuts {
+                    if reservedKeyCodes.contains(shortcut.keyCode) && shortcut.modifiers == 0 {
+                        clearedShortcuts += 1
+                        continue
+                    }
+                    let conflictsWithExisting = activePresetShortcuts.contains(shortcut)
+                    let conflictsWithApp = layoutShortcutConflictMessage(for: shortcut, excluding: nil) != nil
+                    if conflictsWithExisting || conflictsWithApp {
+                        clearedShortcuts += 1
+                    } else {
+                        validShortcuts.append(shortcut)
+                        activePresetShortcuts.insert(shortcut)
+                    }
+                }
+                preset.shortcuts = validShortcuts
+                sanitizeShortcutGlobalFlags(for: &preset)
+                processedPresets.append(preset)
+            }
+
+            layoutPresets.append(contentsOf: processedPresets)
+            if selectedLayoutPresetID == nil {
+                selectedLayoutPresetID = layoutPresets.first?.id
+            }
+            saveLayoutPresets()
+            registerPresetHotKeys()
+            return PresetImportResult(importedCount: processedPresets.count, clearedShortcutsCount: clearedShortcuts)
+        }
+    }
 }
+

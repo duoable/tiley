@@ -28,6 +28,9 @@ struct GridSelection: Equatable, Codable {
     }
 
     func scaled(fromRows sourceRows: Int, columns sourceColumns: Int, toRows targetRows: Int, columns targetColumns: Int) -> GridSelection {
+        if startColumn < 0 || startRow < 0 || endColumn < 0 || endRow < 0 {
+            return self
+        }
         let n = normalized
 
         func scaledStart(_ value: Int, source: Int, target: Int) -> Int {
@@ -264,7 +267,8 @@ struct LayoutPreset: Identifiable, Equatable, Codable {
     }
 
     func scaledSelection(toRows rows: Int, columns: Int) -> GridSelection {
-        selection.scaled(fromRows: baseRows, columns: baseColumns, toRows: rows, columns: columns)
+        guard selection != Self.emptySelection else { return Self.emptySelection }
+        return selection.scaled(fromRows: baseRows, columns: baseColumns, toRows: rows, columns: columns)
     }
 
     func scaledSecondarySelections(toRows rows: Int, columns: Int) -> [GridSelection] {

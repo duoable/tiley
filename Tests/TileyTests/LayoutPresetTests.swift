@@ -249,6 +249,8 @@ struct LayoutPresetTests {
         )
         #expect(preset.isEmpty == true)
         #expect(preset.allSelections.isEmpty)
+        #expect(preset.allScaledSelections(toRows: 8, columns: 8).isEmpty)
+        #expect(preset.scaledSelection(toRows: 8, columns: 8) == LayoutPreset.emptySelection)
     }
 
     @Test("canRestoreMinimizedWindows requires toggleToMinimize true")
