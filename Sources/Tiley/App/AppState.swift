@@ -499,7 +499,7 @@ final class AppState: NSObject, NSMenuDelegate {
     /// hijacking the polling source.
     @ObservationIgnored var recentlySetFrames: [CGWindowID: (frame: CGRect, time: CFAbsoluteTime)] = [:]
     /// Records the last preset application for display cycling detection (especially for constrained windows).
-    @ObservationIgnored var lastPresetPlacement: (windowID: CGWindowID, presetID: UUID, displayID: CGDirectDisplayID, frame: CGRect)?
+    @ObservationIgnored var lastPresetPlacement: (windowID: CGWindowID, pid: pid_t, presetID: UUID, displayID: CGDirectDisplayID, frame: CGRect)?
     /// Windows minimized by presets when toggled to minimize.
     @ObservationIgnored var presetMinimizedWindows: [UUID: [PresetWindowRecord]] = [:]
     /// Batches of windows minimized by presets, organized as a stack.
@@ -1789,23 +1789,24 @@ final class AppState: NSObject, NSMenuDelegate {
     }
 
     /// Single-window variant of `performMoveJobs` that surfaces the
-    /// "constrained" flag and the error for the caller's status message.
+    /// move result (including constrained flag and actual resulting frame)
+    /// and the error for the caller's status message.
     nonisolated static func performMove(
         target: WindowTarget,
         frame: CGRect,
         screenFrame: CGRect,
         windowManager: WindowManager,
         logMoves: Bool
-    ) async -> Result<Bool, Error> {
+    ) async -> Result<WindowMoveResult, Error> {
         await Task.detached(priority: .userInitiated) {
             do {
-                let constrained: Bool
+                let result: WindowMoveResult
                 if logMoves {
-                    constrained = try windowManager.moveWithLog(target: target, to: frame, on: screenFrame)
+                    result = try windowManager.moveWithLog(target: target, to: frame, on: screenFrame)
                 } else {
-                    constrained = try windowManager.move(target: target, to: frame, onScreenFrame: screenFrame)
+                    result = try windowManager.move(target: target, to: frame, onScreenFrame: screenFrame)
                 }
-                return .success(constrained)
+                return .success(result)
             } catch {
                 return .failure(error)
             }
@@ -2060,11 +2061,12 @@ final class AppState: NSObject, NSMenuDelegate {
                 target: target, frame: frame, screenFrame: target.screenFrame,
                 windowManager: wm, logMoves: logMoves
             )
-            if case .success = result {
+            if case .success(let moveResult) = result {
                 self.recordTileyPlacedFrames(for: [target.cgWindowID])
                 if let selPresetID = self.selectedLayoutPresetID,
                    let screen = NSScreen.screens.first(where: { $0.frame == target.screenFrame }) {
-                    self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
+                    let recordedFrame = moveResult.constrained ? moveResult.actualFrame : frame
+                    self.lastPresetPlacement = (windowID: target.cgWindowID, pid: target.processIdentifier, presetID: selPresetID, displayID: screen.displayID, frame: recordedFrame)
                 }
                 if let selPresetID = self.selectedLayoutPresetID {
                     self.presetPlacedWindows[selPresetID] = [target.cgWindowID]
@@ -2167,11 +2169,12 @@ final class AppState: NSObject, NSMenuDelegate {
                 target: target, frame: frame, screenFrame: currentScreenFrame,
                 windowManager: wm, logMoves: logMoves
             )
-            if case .success = result {
+            if case .success(let moveResult) = result {
                 self.recordTileyPlacedFrames(for: [target.cgWindowID])
                 if let selPresetID = self.selectedLayoutPresetID,
                    let screen = NSScreen.screens.first(where: { $0.frame == currentScreenFrame }) {
-                    self.lastPresetPlacement = (windowID: target.cgWindowID, presetID: selPresetID, displayID: screen.displayID, frame: frame)
+                    let recordedFrame = moveResult.constrained ? moveResult.actualFrame : frame
+                    self.lastPresetPlacement = (windowID: target.cgWindowID, pid: target.processIdentifier, presetID: selPresetID, displayID: screen.displayID, frame: recordedFrame)
                 }
                 if let selPresetID = self.selectedLayoutPresetID {
                     self.presetPlacedWindows[selPresetID] = [target.cgWindowID]
@@ -2235,7 +2238,7 @@ final class AppState: NSObject, NSMenuDelegate {
             activeLayoutTarget = actualTarget
             lastTargetPID = actualTarget.processIdentifier
 
-            if handleTogglePresetIfApplicable(preset: preset, target: actualTarget) {
+            if actualTarget.screenFrame == screenFrame && handleTogglePresetIfApplicable(preset: preset, target: actualTarget) {
                 return
             }
 

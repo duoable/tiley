@@ -158,7 +158,30 @@ extension AppState {
         }
 
         let focused = windowManager?.captureFocusedWindow(preferredPID: lastTargetPID)
-        if let focused, isListed(focused) {
+        if var focused, isListed(focused) {
+            if focused.cgWindowID == 0,
+               let matched = allTargets.first(where: {
+                   $0.processIdentifier == focused.processIdentifier
+                   && abs($0.frame.origin.x - focused.frame.origin.x) < tolerance
+                   && abs($0.frame.origin.y - focused.frame.origin.y) < tolerance
+                   && abs($0.frame.width - focused.frame.width) < tolerance
+                   && abs($0.frame.height - focused.frame.height) < tolerance
+               }) {
+                focused = WindowTarget(
+                    appElement: focused.appElement,
+                    windowElement: focused.windowElement,
+                    processIdentifier: focused.processIdentifier,
+                    appName: focused.appName,
+                    windowTitle: focused.windowTitle,
+                    frame: focused.frame,
+                    visibleFrame: focused.visibleFrame,
+                    screenFrame: focused.screenFrame,
+                    isHidden: focused.isHidden,
+                    spaceID: matched.spaceID,
+                    isOnOtherSpace: focused.isOnOtherSpace,
+                    cgWindowID: matched.cgWindowID
+                )
+            }
             return focused
         }
         // The cache lacks windows opened since its last refresh. Recapture
@@ -167,8 +190,31 @@ extension AppState {
             allTargets = windowManager?.captureAllWindows().targets ?? []
         }
 
-        if let focused {
+        if var focused {
             if usesCache, isListed(focused) {
+                if focused.cgWindowID == 0,
+                   let matched = allTargets.first(where: {
+                       $0.processIdentifier == focused.processIdentifier
+                       && abs($0.frame.origin.x - focused.frame.origin.x) < tolerance
+                       && abs($0.frame.origin.y - focused.frame.origin.y) < tolerance
+                       && abs($0.frame.width - focused.frame.width) < tolerance
+                       && abs($0.frame.height - focused.frame.height) < tolerance
+                   }) {
+                    focused = WindowTarget(
+                        appElement: focused.appElement,
+                        windowElement: focused.windowElement,
+                        processIdentifier: focused.processIdentifier,
+                        appName: focused.appName,
+                        windowTitle: focused.windowTitle,
+                        frame: focused.frame,
+                        visibleFrame: focused.visibleFrame,
+                        screenFrame: focused.screenFrame,
+                        isHidden: focused.isHidden,
+                        spaceID: matched.spaceID,
+                        isOnOtherSpace: focused.isOnOtherSpace,
+                        cgWindowID: matched.cgWindowID
+                    )
+                }
                 return focused
             }
             // The focused window is not a real window (e.g. Finder's desktop).

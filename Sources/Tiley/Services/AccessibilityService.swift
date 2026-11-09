@@ -9,6 +9,14 @@ struct WindowResizability {
     static let none = WindowResizability(horizontal: false, vertical: false)
 }
 
+struct WindowMoveResult: Sendable {
+    let constrained: Bool
+    let actualFrame: CGRect
+}
+
+@_silgen_name("_AXUIElementGetWindow")
+func _AXUIElementGetWindow(_ element: AXUIElement, _ identifier: inout CGWindowID) -> AXError
+
 struct WindowTarget {
     let appElement: AXUIElement
     /// `nil` for hidden-app placeholders whose AX windows couldn't be queried.
@@ -254,6 +262,9 @@ final class AccessibilityService {
             throw WindowAccessError.unsupportedWindow
         }
 
+        var cgID: CGWindowID = 0
+        _ = _AXUIElementGetWindow(windowElement, &cgID)
+
         let screen = resolveScreen(forAXOrigin: origin, size: sizeRect)
         let frame = frameForAXOrigin(origin, size: sizeRect, on: screen)
         let screenFrame = screen?.frame ?? NSScreen.main?.frame ?? frame
@@ -270,10 +281,11 @@ final class AccessibilityService {
             frame: frame,
             visibleFrame: visibleFrame,
             screenFrame: screenFrame,
-            isHidden: NSRunningApplication(processIdentifier: pid)?.isHidden ?? false
+            isHidden: NSRunningApplication(processIdentifier: pid)?.isHidden ?? false,
+            cgWindowID: cgID
         )
         let elapsed = (CFAbsoluteTimeGetCurrent() - perfStart) * 1000
-        debugLog("windowTarget(for: \(pid)) done (\(String(format: "%.1f", elapsed))ms)")
+        debugLog("windowTarget(for: \(pid)) done (cgID=\(cgID)) (\(String(format: "%.1f", elapsed))ms)")
         return result
     }
 
@@ -557,7 +569,7 @@ final class AccessibilityService {
     ///   placed (partly off-screen or straddling displays) — pass `false`.
     @discardableResult
     func setFrame(_ frame: CGRect, on screenFrame: CGRect, for window: AXUIElement,
-                  constrainToVisibleFrame: Bool = true) throws -> Bool {
+                  constrainToVisibleFrame: Bool = true) throws -> WindowMoveResult {
         // Exit native fullscreen before resizing — fullscreen windows
         // cannot be moved or resized via the Accessibility API.
         exitFullScreenIfNeeded(window)
@@ -572,6 +584,7 @@ final class AccessibilityService {
         let (actualPos, actualSize) = readPositionAndSize(of: window)
         let constrained = abs(actualSize.width - targetSize.width) > 2
                        || abs(actualSize.height - targetSize.height) > 2
+        var finalPos = actualPos
         if constrained && constrainToVisibleFrame {
             let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? screenFrame.maxY
             // Compute the AX bounds of the target screen's visible frame.
@@ -599,11 +612,16 @@ final class AccessibilityService {
                 var adj = adjusted
                 if let val = AXValueCreate(.cgPoint, &adj) {
                     AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, val)
+                    finalPos = adjusted
                 }
             }
         }
 
-        return constrained
+        let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? screenFrame.maxY
+        let targetScreen = NSScreen.screens.first { $0.frame == screenFrame }
+        let actualFrame = frameForAXOrigin(finalPos, size: actualSize, on: targetScreen, primaryMaxY: primaryMaxY)
+
+        return WindowMoveResult(constrained: constrained, actualFrame: actualFrame)
     }
 
     /// Reads the current AX position and size of a window.

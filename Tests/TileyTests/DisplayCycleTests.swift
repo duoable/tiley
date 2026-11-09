@@ -34,6 +34,29 @@ struct DisplayCycleTests {
         #expect(!AppState.isWindowFrame(frameA, approximatelyMatching: frameB, tolerance: 3.0))
     }
 
+    @Test("isWindowMatchingPresetFrame matches terminal window snapped to character cells")
+    func terminalCharacterSnappingMatches() {
+        let expected = CGRect(x: 100, y: 150, width: 800, height: 600)
+        // Terminal width slightly smaller (-5pt) and height slightly smaller (-15pt due to cell height)
+        // With top anchored (AppKit maxY = 150 + 600 = 750, so terminal minY = 750 - 585 = 165)
+        let terminalFrame = CGRect(x: 100, y: 165, width: 795, height: 585)
+        #expect(AppState.isWindowMatchingPresetFrame(terminalFrame, expected: expected))
+    }
+
+    @Test("isWindowMatchingPresetFrame rejects window with wrong position")
+    func terminalWrongPositionFails() {
+        let expected = CGRect(x: 100, y: 150, width: 800, height: 600)
+        let wrongPosFrame = CGRect(x: 200, y: 150, width: 795, height: 595)
+        #expect(!AppState.isWindowMatchingPresetFrame(wrongPosFrame, expected: expected))
+    }
+
+    @Test("isWindowMatchingPresetFrame rejects window exceeding character cell size difference")
+    func terminalExcessiveSizeDifferenceFails() {
+        let expected = CGRect(x: 100, y: 150, width: 800, height: 600)
+        let wayTooSmallFrame = CGRect(x: 100, y: 150, width: 700, height: 500)
+        #expect(!AppState.isWindowMatchingPresetFrame(wayTooSmallFrame, expected: expected))
+    }
+
     // MARK: - SettingsSnapshot
 
     @Test("SettingsSnapshot includes cycleDisplaysOnRepeatedShortcut")

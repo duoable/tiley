@@ -110,22 +110,28 @@ final class WindowManager {
     }
 
     @discardableResult
-    func move(target: WindowTarget, to frame: CGRect) throws -> Bool {
-        guard let window = target.windowElement else { return false }
+    func move(target: WindowTarget, to frame: CGRect) throws -> WindowMoveResult {
+        guard let window = target.windowElement else {
+            return WindowMoveResult(constrained: false, actualFrame: frame)
+        }
         return try accessibilityService.setFrame(frame, on: target.screenFrame, for: window)
     }
 
     @discardableResult
-    func move(target: WindowTarget, to frame: CGRect, onScreenFrame screenFrame: CGRect) throws -> Bool {
-        guard let window = target.windowElement else { return false }
+    func move(target: WindowTarget, to frame: CGRect, onScreenFrame screenFrame: CGRect) throws -> WindowMoveResult {
+        guard let window = target.windowElement else {
+            return WindowMoveResult(constrained: false, actualFrame: frame)
+        }
         return try accessibilityService.setFrame(frame, on: screenFrame, for: window)
     }
 
     /// Moves/resizes a window using the AX API and writes debug info
     /// to `~/tiley.log` when logging is enabled.
     @discardableResult
-    func moveWithLog(target: WindowTarget, to frame: CGRect, on screenFrame: CGRect) throws -> Bool {
-        guard let window = target.windowElement else { return false }
+    func moveWithLog(target: WindowTarget, to frame: CGRect, on screenFrame: CGRect) throws -> WindowMoveResult {
+        guard let window = target.windowElement else {
+            return WindowMoveResult(constrained: false, actualFrame: frame)
+        }
 
         let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? screenFrame.maxY
         let axX = frame.minX
@@ -180,7 +186,7 @@ final class WindowManager {
         logSpace("[before]")
 
         // Perform the actual resize
-        let constrained = try accessibilityService.setFrame(frame, on: screenFrame, for: window)
+        let moveResult = try accessibilityService.setFrame(frame, on: screenFrame, for: window)
 
         logState("[after]")
         logSpace("[after]")
@@ -199,7 +205,7 @@ final class WindowManager {
             log("OK")
         }
 
-        return constrained
+        return moveResult
     }
 
     /// After a move/resize, always raises the window to the front.

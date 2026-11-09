@@ -446,10 +446,15 @@ extension AppState {
                     columns: columns,
                     gap: gap
                 )
-                let matchesExpected = Self.isWindowFrame(target.frame, approximatelyMatching: expected, tolerance: 5.0)
-                let matchesRecorded = (lastPresetPlacement?.windowID == target.cgWindowID
-                    && lastPresetPlacement?.presetID == presetID
-                    && Self.isWindowFrame(target.frame, approximatelyMatching: lastPresetPlacement!.frame, tolerance: 5.0))
+                let matchesExpected = Self.isWindowMatchingPresetFrame(target.frame, expected: expected, tolerance: 5.0)
+                let matchesRecorded: Bool = {
+                    guard let recorded = lastPresetPlacement else { return false }
+                    guard recorded.presetID == presetID else { return false }
+                    let matchesWindow = (recorded.windowID != 0 && recorded.windowID == target.cgWindowID)
+                        || recorded.pid == target.processIdentifier
+                    guard matchesWindow else { return false }
+                    return Self.isWindowMatchingPresetFrame(target.frame, expected: recorded.frame, tolerance: 5.0)
+                }()
                 isAlreadyArranged = matchesExpected || matchesRecorded
             } else {
                 if let placedIDs = presetPlacedWindows[presetID], placedIDs.count >= allSelections.count {
@@ -570,6 +575,30 @@ extension AppState {
         abs(current.height - target.height) <= tolerance
     }
 
+    /// Returns true if `current` matches `expected` within exact tolerance, or within
+    /// character-cell snapping tolerances typical of terminal emulators (Terminal.app, iTerm2, etc.).
+    nonisolated static func isWindowMatchingPresetFrame(_ current: CGRect, expected: CGRect, tolerance: CGFloat = 3.0) -> Bool {
+        if isWindowFrame(current, approximatelyMatching: expected, tolerance: tolerance) {
+            return true
+        }
+
+        // Character-cell constrained tolerance:
+        // Terminal windows align to top-left (AppKit: minX, maxY) within standard tolerance,
+        // while width and height may be smaller by up to 1 character cell (~25pt width, ~35pt height).
+        let xMatches = abs(current.minX - expected.minX) <= 5.0
+        let yMatches = abs(current.maxY - expected.maxY) <= 5.0 || abs(current.minY - expected.minY) <= 5.0
+
+        guard xMatches && yMatches else { return false }
+
+        let widthDiff = expected.width - current.width
+        let heightDiff = expected.height - current.height
+
+        let widthAcceptable = widthDiff >= -5.0 && widthDiff <= 25.0
+        let heightAcceptable = heightDiff >= -5.0 && heightDiff <= 35.0
+
+        return widthAcceptable && heightAcceptable
+    }
+
     /// Returns the next display in physical arrangement order (or connected displays order).
     func nextScreen(after currentScreen: NSScreen) -> NSScreen? {
         let resolver = displayFingerprintResolverForHotKeys()
@@ -610,11 +639,16 @@ extension AppState {
             gap: gap
         )
 
-        let isAtExpected = Self.isWindowFrame(currentTarget.frame, approximatelyMatching: expectedFrame)
-        let isAtRecordedConstrained = lastPresetPlacement?.windowID == currentTarget.cgWindowID
-            && lastPresetPlacement?.presetID == id
-            && lastPresetPlacement?.displayID == currentScreen.displayID
-            && Self.isWindowFrame(currentTarget.frame, approximatelyMatching: lastPresetPlacement!.frame)
+        let isAtExpected = Self.isWindowMatchingPresetFrame(currentTarget.frame, expected: expectedFrame)
+        let isAtRecordedConstrained: Bool = {
+            guard let recorded = lastPresetPlacement else { return false }
+            guard recorded.presetID == id && recorded.displayID == currentScreen.displayID else { return false }
+            let matchesWindow = (recorded.windowID != 0 && recorded.windowID == currentTarget.cgWindowID)
+                || recorded.pid == currentTarget.processIdentifier
+            guard matchesWindow else { return false }
+            return Self.isWindowFrame(currentTarget.frame, approximatelyMatching: recorded.frame, tolerance: 5.0)
+                || Self.isWindowMatchingPresetFrame(currentTarget.frame, expected: recorded.frame)
+        }()
 
         if isAtExpected || isAtRecordedConstrained {
             return nextScreen(after: currentScreen)
